@@ -7,7 +7,7 @@ pub mod config;
 pub mod economic_gate;
 
 // Re-exports (SDK surface)
-pub use qp44::{QP44, WalletRequest, CoinType};
+pub use qp44::{QP44, WalletRequest, CoinType, Heritage};
 pub use purpose::{Purpose, QuantPermBuilder};
 pub use protocol_id::QuantumId;
 pub use protocolvalue::Qtm;

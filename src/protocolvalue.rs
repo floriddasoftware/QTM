@@ -1,7 +1,8 @@
 // src/protocolvalue.rs
 
-use quantom_value::{Observer, QuantPerm, DimensionObservation, Dimension};
+use quantom_value::{QuantPerm, DimensionObservation, Dimension};
 use crate::protocol_id::QuantumId;
+use crate::qp44::Heritage;
 use blake3;
 
 #[derive(Debug, Clone)]
@@ -23,32 +24,37 @@ pub struct Qtm {
 
 
 impl Qtm {
-    pub fn from_quantperm(
-        qp: &QuantPerm,
-        protocol: &QuantumId,
+    pub fn economy(
+        heritage: &Heritage,
     ) -> Value {
-        let seed = crate::config::require_seed(
-            crate::economic_gate::verify_balance(1, 1)
-            .expect("Economic gate failed"),
-        );        let obs = Observer::observe(qp, Some(&seed));
-        Self::from_observation(&obs, protocol)
+        
+        let protocol = QuantumId::new();
+
+        // 🔹 Build observation directly from Heritage
+        let obs = DimensionObservation {
+            dimension: heritage.state.dimension(),
+            structural_value: heritage.state.structural_value(),
+            activations: heritage.state.activations(),
+            seed: heritage.transition.origin,
+               };
+
+        Self::from_observation(&obs, &protocol)
     }
 
-  
     /// Build a ValueSlice from an observation
     pub fn from_observation(
-    obs: &DimensionObservation,
-    protocol: &QuantumId,
+        obs: &DimensionObservation,
+        protocol: &QuantumId,
     ) -> Value {
-    let density = protocol.density(obs);
+        let density = protocol.density(obs);
 
-    Value {
-        dimension: obs.dimension,
-        structural_value: obs.structural_value,
-        activations: obs.activations,
-        density,
+        Value {
+            dimension: obs.dimension,
+            structural_value: obs.structural_value,
+            activations: obs.activations,
+            density,
+        }
     }
-}
 
 
     // ─────────────────────────────────────────────

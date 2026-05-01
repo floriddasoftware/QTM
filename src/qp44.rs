@@ -1,9 +1,8 @@
 // src/qp44.rs
 
-use quantom_value::{QuantPerm, Dimension, SeedType};
+use quantom_value::{QuantPerm, Dimension, TransitionHeritage};
 use crate::purpose::{Purpose as SeedPurpose, SeedSource};
 use crate::protocolvalue::Qtm; // ✅ delegate forensic truth
-
 pub const PURPOSE_44: u128 = 44;
 pub const HARDENED_OFFSET: u128 = 0x8000_0000;
 
@@ -80,19 +79,9 @@ pub struct WalletOutput {
 // ─────────────────────────────────────────────
 
 #[repr(C)]
-pub struct Heritage {
-    pub retained_mass: u128,
-    pub activation_count: u64,
-    pub dimension: Dimension,
-    pub structural_value: u128,
-    pub gravity: u128,
-
-    // 🔥 Forensic signals delegated from QuantPerm
-    pub tau: u128,
-    pub delta: u128,
-    pub gross_work: u128,
-    pub net_work: u128,
-    pub origin: SeedType,    
+pub struct Heritage<'a> {
+    pub state: &'a QuantPerm,
+    pub transition: TransitionHeritage,
 }
 
 // ─────────────────────────────────────────────
@@ -113,10 +102,6 @@ impl QP44Wallet {
     ) -> Self {
         manifold.set_initial_dimension_from_perm();
 
-        if manifold.activations() > 0 {
-            let sigma = manifold.structural_value();
-            manifold.retain(sigma);
-        }
 
         Self { manifold, coin, external }
     }
@@ -129,19 +114,19 @@ impl QP44Wallet {
             (change as u128) +
             (self.external as u128);
 
-        self.manifold.retain(total_mass);
 
-        let qp = crate::config::require_seed(
+        let qp = crate::protocol_id::QuantumId.quantum_seed(
             crate::economic_gate::verify_balance(1, 1)
-                .expect("Economic gate failed")
+                .expect("Economic gate failed"),
         );
-
+    
         let sigma = self.manifold.structural_value();
         let before_dim = self.manifold.dimension();
 
-        let gravity = self.manifold.transition(Some(&qp));
+        let gravity = transition(&mut self.manifold, &qp);
         let after_dim = self.manifold.dimension();
-
+        self.manifold.retain(total_mass);
+        
     // 🔥 Delegate forensic signals to QuantPerm::calculate_work
     let (tau, delta, gross_work) =
         QuantPerm::calculate_work(
@@ -153,18 +138,17 @@ impl QP44Wallet {
 
     let net_work = gross_work.saturating_sub(sigma);
 
-        Heritage {
-            retained_mass: self.manifold.retained_mass(),
-            activation_count: self.manifold.activations(),
-            dimension: self.manifold.dimension(),
-            structural_value: self.manifold.structural_value(),
-            gravity: gravity.tau as u128,
+    Heritage {
+        state: &self.manifold,
+
+        transition: TransitionHeritage {
             tau,
             delta,
             gross_work,
             net_work,
             origin: gravity.origin,
-        }
+        },
+    }
     }
 
     pub fn next_receive(&mut self) -> Heritage {
@@ -182,6 +166,15 @@ impl QP44Wallet {
     pub fn into_manifold(self) -> QuantPerm {
         self.manifold
     }
+}
+
+
+//Transition
+fn transition(
+    manifold: &mut QuantPerm,
+    seed: &[u8; 32],
+) -> TransitionHeritage {
+    manifold.transition(Some(seed))
 }
 
 // ─────────────────────────────────────────────
@@ -221,8 +214,8 @@ impl QP44 {
 
             // 🔥 CRITICAL: commit using POST-TRANSITION manifold
             let qtm = Qtm::commit(
-                &wallet.manifold,
-                result.net_work,
+                &result.state,
+                result.transition.net_work,
             );
             
             outputs.push(WalletOutput {

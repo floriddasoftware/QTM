@@ -47,10 +47,10 @@ pub fn verify_cost(
     // 1. Observation is DERIVED ONLY from Heritage
     // ─────────────────────────────
     let obs = DimensionObservation {
-        dimension: heritage.dimension,
-        structural_value: heritage.structural_value,
-        activations: heritage.activation_count,
-        seed: heritage.origin 
+        dimension: heritage.state.dimension(),
+        structural_value: heritage.state.structural_value(),
+        activations: heritage.state.activations(),
+        seed: heritage.transition.origin,
     };
 
     // ─────────────────────────────
@@ -61,7 +61,7 @@ pub fn verify_cost(
     let density = protocol.density(&obs).unwrap_or(0);
 
     let required = protocol
-        .locked_debt(&obs, heritage.tau)
+        .locked_debt(&obs, heritage.transition.tau)
         .unwrap_or(0);
 
    
@@ -74,8 +74,8 @@ pub fn verify_cost(
 pub struct Structure {
     pub coin: CoinType,
     pub commitment: String, // 🔥 qp{...} (public identity)
-    pub address: String,    // derived projection
-    pub balance: u128,
+    pub address: String,    // derived projection <- particular curve
+    pub balance: u128,   // <-(internal density = external density) of required
 }
 
 impl Structure {
