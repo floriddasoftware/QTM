@@ -101,8 +101,6 @@ impl QP44Wallet {
         external: u32,
     ) -> Self {
         manifold.set_initial_dimension_from_perm();
-
-
         Self { manifold, coin, external }
     }
 
@@ -114,41 +112,41 @@ impl QP44Wallet {
             (change as u128) +
             (self.external as u128);
 
+        let sigma = self.manifold.structural_value();
+        let before_dim = self.manifold.dimension();
+
+        // ✅ 1. retain FIRST
+        retain(&mut self.manifold, total_mass);
 
         let qp = crate::protocol_id::QuantumId.quantum_seed(
             crate::economic_gate::verify_balance(1, 1)
                 .expect("Economic gate failed"),
         );
-    
-        let sigma = self.manifold.structural_value();
-        let before_dim = self.manifold.dimension();
 
+        // ✅ 2. transition
         let gravity = transition(&mut self.manifold, &qp);
         let after_dim = self.manifold.dimension();
-        self.manifold.retain(total_mass);
-        
-    // 🔥 Delegate forensic signals to QuantPerm::calculate_work
-    let (tau, delta, gross_work) =
-        QuantPerm::calculate_work(
-            self.manifold.retained_mass(),
-            &qp,          // use the protocol seed bytes as mirror
-            after_dim,
-            before_dim,
-        );
 
-    let net_work = gross_work.saturating_sub(sigma);
+        // ✅ 3. compute work
+        let (tau, delta, gross_work, net_work) =
+            calculate_work(
+                &self.manifold,
+                &qp,
+                before_dim,
+                after_dim,
+                sigma,
+            );
 
-    Heritage {
-        state: &self.manifold,
-
-        transition: TransitionHeritage {
-            tau,
-            delta,
-            gross_work,
-            net_work,
-            origin: gravity.origin,
-        },
-    }
+        Heritage {
+            state: &self.manifold,
+            transition: TransitionHeritage {
+                tau,
+                delta,
+                gross_work,
+                net_work,
+                origin: gravity.origin,
+            },
+        }
     }
 
     pub fn next_receive(&mut self) -> Heritage {
@@ -169,13 +167,42 @@ impl QP44Wallet {
 }
 
 
-//Transition
+
+
+fn retain(
+    manifold: &mut QuantPerm,
+    mass: u128,
+) {
+    manifold.retain(mass);
+}
+
 fn transition(
     manifold: &mut QuantPerm,
     seed: &[u8; 32],
 ) -> TransitionHeritage {
     manifold.transition(Some(seed))
 }
+
+fn calculate_work(
+    manifold: &QuantPerm,
+    seed: &[u8; 32],
+    from_dim: Dimension,
+    to_dim: Dimension,
+    sigma: u128,
+) -> (u128, u128, u128, u128) {
+    let (tau, delta, gross_work) =
+        QuantPerm::calculate_work(
+            manifold.retained_mass(),
+            seed,
+            to_dim,
+            from_dim,
+        );
+
+    let net_work = gross_work.saturating_sub(sigma);
+
+    (tau, delta, gross_work, net_work)
+}
+
 
 // ─────────────────────────────────────────────
 // 🔹 Wallet Request (SDK)
