@@ -5,7 +5,7 @@ use crate::protocol_id::QuantumId;
 use crate::qp44::Heritage;
 use blake3;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Value {
     pub dimension: Dimension,
     pub structural_value: u128,

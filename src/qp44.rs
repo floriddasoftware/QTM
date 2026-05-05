@@ -123,6 +123,7 @@ impl QP44Wallet {
                 .expect("Economic gate failed"),
         );
 
+
         // ✅ 2. transition
         let gravity = transition(&mut self.manifold, &qp);
         let after_dim = self.manifold.dimension();

@@ -1,10 +1,6 @@
-use std::collections::HashMap;
-use futures::future::join_all;
-
-use crate::pathsregistry::PathsRegistry;
-use crate::qp44::{CoinType, Heritage};        
-use crate::protocol_id::QuantumId;       
-use quantom_value::{DimensionObservation};
+use crate::qp44::{CoinType, Heritage};
+use crate::protocol_id::QuantumId;
+use quantom_value::DimensionObservation;
 
 //
 // 🔹 Secure Balance Proof Gate (Sealed)
@@ -17,7 +13,6 @@ pub trait BalanceProof: sealed::Sealed {}
 
 pub struct VerifiedBalanceProof(());
 
-
 impl sealed::Sealed for VerifiedBalanceProof {}
 impl BalanceProof for VerifiedBalanceProof {}
 
@@ -27,25 +22,24 @@ impl VerifiedBalanceProof {
     }
 }
 
-
-// 🔹 Canonical Gate
-
-pub fn verify_balance(balance: u128, required: u128) -> Option<VerifiedBalanceProof> {
-    if balance >= required {
-        Some(VerifiedBalanceProof::new())
-    } else {
-        None
-    }
+//
+// 🔹 Canonical Gate (NO DUPLICATION)
+//
+pub fn verify_balance(
+    balance: u128,
+    required: u128,
+) -> Option<VerifiedBalanceProof> {
+    (balance >= required).then(|| VerifiedBalanceProof::new())
 }
 
-
+//
+// 🔹 Canonical Cost Verification (ONLY SOURCE OF TRUTH)
+//
 pub fn verify_cost(
-    heritage: Heritage,
+    heritage: &Heritage,
 ) -> Option<VerifiedBalanceProof> {
 
-    // ─────────────────────────────
-    // 1. Observation is DERIVED ONLY from Heritage
-    // ─────────────────────────────
+    // 1. Observation (ONLY from Heritage)
     let obs = DimensionObservation {
         dimension: heritage.state.dimension(),
         structural_value: heritage.state.structural_value(),
@@ -53,143 +47,116 @@ pub fn verify_cost(
         seed: heritage.transition.origin,
     };
 
-    // ─────────────────────────────
-    // 2. Protocol law (pure stateless operator)
-    // ─────────────────────────────
+    // 2. Protocol (stateless law)
     let protocol = QuantumId::new();
 
     let density = protocol.density(&obs).unwrap_or(0);
 
+    // 🔥 Use NETWORK (tau) as instantaneous field
     let required = protocol
         .locked_debt(&obs, heritage.transition.tau)
         .unwrap_or(0);
 
-   
+    // 3. Gate
     verify_balance(density, required)
 }
 
-
-// 🔹 Canonical Structure (Commitment-Based)
+//
+// 🔹 Structure (Projection only — no external truth)
+//
 #[derive(Clone)]
 pub struct Structure {
     pub coin: CoinType,
-    pub commitment: String, // 🔥 qp{...} (public identity)
-    pub address: String,    // derived projection <- particular curve
-    pub balance: u128,   // <-(internal density = external density) of required
+    pub commitment: [u8; 32], // 🔥 canonical identity
+    pub density: u128,        // 🔥 derived, not fetched
 }
 
 impl Structure {
 
-    pub fn prove(&self, required: u128) -> Option<VerifiedBalanceProof> {
-        verify_balance(self.balance, required)
-    }
-}
+    pub fn from_heritage(
+        coin: CoinType,
+        heritage: &Heritage,
+        commitment: [u8; 32],
+    ) -> Self {
 
-//
-// 🔹 Economy (Stateful, Indexed)
-//
-pub struct Economy {
-    pub gravity: u128,   // passed in from QuantPerm::transition()
-    pub structures: Vec<Structure>,
-    index: HashMap<(CoinType, String), usize>,
-}
+        let protocol = QuantumId::new();
 
+        let obs = DimensionObservation {
+            dimension: heritage.state.dimension(),
+            structural_value: heritage.state.structural_value(),
+            activations: heritage.state.activations(),
+            seed: heritage.transition.origin,
+        };
 
-impl Economy {
-    /// Build index for fast lookup
-    fn build_index(structures: &[Structure]) -> HashMap<(CoinType, String), usize> {
-        structures
-            .iter()
-            .enumerate()
-            .map(|(i, s)| ((s.coin, s.address.clone()), i))
-            .collect()
-    }
+        let density = protocol.density(&obs).unwrap_or(0);
 
-    /// Total backing (canonical)
-    pub fn total_backing(&self) -> u128 {
-        self.structures.iter().map(|s| s.balance).sum()
-    }
-
-    /// Refresh balances across all chains in parallel
-    pub async fn refresh_balances(&mut self) {
-        let futures = self.structures.iter().map(|s| {
-            let coin = s.coin;
-            let addr = s.address.clone();
-
-            async move {
-                let balance = PathsRegistry::query_balance(coin, &addr)
-                    .await
-                    .unwrap_or(0);
-                (coin, addr, balance)
-            }
-        });
-
-        let results = join_all(futures).await;
-
-        for (coin, addr, balance) in results {
-            if let Some(&i) = self.index.get(&(coin, addr.clone())) {
-                self.structures[i].balance = balance;
-            }
+        Structure {
+            coin,
+            commitment,
+            density,
         }
     }
+
+    pub fn prove(
+        &self,
+        required: u128,
+    ) -> Option<VerifiedBalanceProof> {
+        verify_balance(self.density, required)
+    }
 }
 
 //
-// 🔹 Economy Construction from QuantPerm Transition
+// 🔹 Economy (PURE PROJECTION — NO NETWORK)
 //
+pub struct Economy {
+    pub gravity: u128,
+    pub structures: Vec<Structure>,
+}
+
 impl Economy {
-    /// Build from a single transition
-    ///
-    /// commitment = qp{...}
-    /// coordinate NEVER exposed
+
+    pub fn total_density(&self) -> u128 {
+        self.structures.iter().map(|s| s.density).sum()
+    }
+
     pub fn from_transition(
-        gravity: u128,
-        commitment: String,
-        derive_address: impl Fn(CoinType) -> String,
+        heritage: &Heritage,
+        commitment: [u8; 32],
     ) -> Self {
+
         let mut structures = Vec::new();
 
         for &coin in CoinType::all() {
-            let address = derive_address(coin);
-        
-            structures.push(Structure {
-                coin,
-                commitment: commitment.clone(),
-                address,
-                balance: 0,
-            });
+            structures.push(
+                Structure::from_heritage(
+                    coin,
+                    heritage,
+                    commitment,
+                )
+            );
         }
 
-        let index = Self::build_index(&structures);
-
         Economy {
-            gravity,
+            gravity: heritage.transition.tau,
             structures,
-            index,
         }
     }
 }
 
 //
-// 🔹 Global Ledger (Multi-Transition Economy)
+// 🔹 Global Ledger (Optional Aggregation Layer)
 //
 pub struct EconomyLedger {
     pub states: Vec<Economy>,
 }
 
 impl EconomyLedger {
-    /// Total backing across ALL transitions
-    pub fn total_backing(&self) -> u128 {
+
+    pub fn total_density(&self) -> u128 {
         self.states
             .iter()
             .flat_map(|e| &e.structures)
-            .map(|s| s.balance)
+            .map(|s| s.density)
             .sum()
-    }
-
-    /// Refresh all states
-    pub async fn refresh_all(&mut self) {
-        let futures = self.states.iter_mut().map(|e| e.refresh_balances());
-        join_all(futures).await;
     }
 }

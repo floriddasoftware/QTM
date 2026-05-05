@@ -2,8 +2,6 @@
 
 use qp_hd::qp44::{CoinType, Purpose, QP44, WalletRequest};
 use qp_hd::purpose::{SeedSource};
-use qp_hd::pathsregistry::PathsRegistry;
-
 
 use k256::SecretKey;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
@@ -126,16 +124,13 @@ async fn main() {
                 bs58::encode(public.to_bytes()).into_string()
             }
         };
-
-        println!("Blockchain Address: {}", address);
-
-        // 6️⃣ Balance query
-        match PathsRegistry::query_balance(w.coin, &address).await {
-            Ok(balance) => println!("Balance: {}\n", balance),
-            Err(err) => println!("Error: {}\n", err),
+        
+            println!("Blockchain Address: {}", address);
+        
+            // 🔹 QTM Receipt (correct layer)
+            println!("QTM Receipt:");
+        
+        
+            println!();
         }
-    }
-
-    println!("✨ Done.");
-
 }
