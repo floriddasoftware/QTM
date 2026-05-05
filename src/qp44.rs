@@ -79,11 +79,16 @@ pub struct WalletOutput {
 // ─────────────────────────────────────────────
 
 #[repr(C)]
+pub struct QP44Event<'a> {
+    pub heritage: Heritage<'a>,
+    pub qtm: Qtm,
+}
+
+#[repr(C)]
 pub struct Heritage<'a> {
     pub state: &'a QuantPerm,
     pub transition: TransitionHeritage,
 }
-
 // ─────────────────────────────────────────────
 // 🔹 Stateful Wallet Engine
 // ─────────────────────────────────────────────
@@ -104,7 +109,7 @@ impl QP44Wallet {
         Self { manifold, coin, external }
     }
 
-    fn realize(&mut self, change: u32) -> Heritage {
+    fn realize(&mut self, change: u32) -> QP44Event<'_> {
         let total_mass =
             (PURPOSE_44 + HARDENED_OFFSET) +
             (self.coin.retained_mass() + HARDENED_OFFSET) +
@@ -137,37 +142,42 @@ impl QP44Wallet {
                 after_dim,
                 sigma,
             );
-
-        Heritage {
-            state: &self.manifold,
-            transition: TransitionHeritage {
-                tau,
-                delta,
-                gross_work,
-                net_work,
-                origin: gravity.origin,
-            },
+            let heritage = Heritage {
+                state: &self.manifold,
+                transition: TransitionHeritage {
+                    tau,
+                    delta,
+                    gross_work,
+                    net_work,
+                    origin: gravity.origin,
+                },
+            };
+    
+            // 🔥 Commit 
+            let qtm = Qtm::commit(
+                heritage.state,
+                heritage.transition.net_work,
+            );
+    
+            QP44Event { heritage, qtm }
+        }
+    
+        pub fn next_receive(&mut self) -> QP44Event<'_> {
+            self.realize(0)
+        }
+    
+        pub fn next_change(&mut self) -> QP44Event<'_> {
+            self.realize(1)
+        }
+    
+        pub fn replay(&mut self, index: u32) {
+            self.external = index;
+        }
+    
+        pub fn into_manifold(self) -> QuantPerm {
+            self.manifold
         }
     }
-
-    pub fn next_receive(&mut self) -> Heritage {
-        self.realize(0)
-    }
-
-    pub fn next_change(&mut self) -> Heritage {
-        self.realize(1)
-    }
-
-    pub fn replay(&mut self, index: u32) {
-        self.external = index;
-    }
-
-    pub fn into_manifold(self) -> QuantPerm {
-        self.manifold
-    }
-}
-
-
 
 
 fn retain(
@@ -241,10 +251,7 @@ impl QP44 {
 
 
             // 🔥 CRITICAL: commit using POST-TRANSITION manifold
-            let qtm = Qtm::commit(
-                &result.state,
-                result.transition.net_work,
-            );
+            let qtm = result.qtm;
             
             outputs.push(WalletOutput {
                 coin: *coin,
