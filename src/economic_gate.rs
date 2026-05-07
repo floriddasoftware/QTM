@@ -50,11 +50,11 @@ pub fn verify_cost(
     // 2. Protocol (stateless law)
     let protocol = QuantumId::new();
 
-    let density = protocol.density(&obs).unwrap_or(0);
+    let density = heritage.transition.net_work;
 
     // 🔥 Use NETWORK (tau) as instantaneous field
     let required = protocol
-        .locked_debt(&obs, heritage.transition.tau)
+        ._debt(&obs, heritage.transition.tau)
         .unwrap_or(0);
 
     // 3. Gate

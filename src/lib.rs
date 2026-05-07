@@ -12,3 +12,4 @@ pub use purpose::{Purpose, QuantPermBuilder};
 pub use protocol_id::{QuantumId};
 pub use protocolvalue::Qtm;
 pub use pathsregistry::PathsRegistry;
+pub use economic_gate::*;

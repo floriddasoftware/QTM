@@ -47,7 +47,7 @@ impl QuantumId {
     /// LockedDebt = min(Density, τ)
     ///
     /// τ must be supplied by the caller (observer layer).
-    pub fn locked_debt(
+    pub fn _debt(
         &self,
         obs: &DimensionObservation,
         tau: u128,
