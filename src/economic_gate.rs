@@ -50,7 +50,7 @@ pub fn verify_cost(
     // 2. Protocol (stateless law)
     let protocol = QuantumId::new();
 
-    let density = heritage.transition.net_work;
+    let density = heritage.transition.gross_work;
 
     // 🔥 Use NETWORK (tau) as instantaneous field
     let required = protocol
