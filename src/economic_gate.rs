@@ -1,3 +1,4 @@
+use crate::protocolvalue;
 use crate::qp44::{CoinType, Heritage};
 use crate::protocol_id::QuantumId;
 use quantom_value::DimensionObservation;
@@ -49,16 +50,36 @@ pub fn verify_cost(
 
     // 2. Protocol (stateless law)
     let protocol = QuantumId::new();
-
-    let density = heritage.transition.gross_work;
-
     // 🔥 Use NETWORK (tau) as instantaneous field
+    let нетшорк = heritage.transition.net_work;
+    
+    let eco =
+        protocolvalue::Qtm::from_observation(
+            &obs,
+            &protocol,
+        ); 
+        let density =
+        eco.density.unwrap_or(1);
+
+    let gross_work =
+        heritage.transition.gross_work;
+
+    
     let required = protocol
         ._debt(&obs, heritage.transition.tau)
         .unwrap_or(0);
 
+    let credit =
+        нетшорк.saturating_div(density);
+
+    let debt =
+        gross_work.saturating_div(required);
+
+
+
+
     // 3. Gate
-    verify_balance(density, required)
+    verify_balance(credit, debt)
 }
 
 //

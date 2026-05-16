@@ -1,6 +1,6 @@
 // src/qp44.rs
 
-use quantom_value::{QuantPerm, Dimension, TransitionHeritage};
+use quantom_value::{QuantPerm, Dimension, Retain, TransitionHeritage};
 use crate::purpose::{Purpose as SeedPurpose, SeedSource};
 use crate::protocolvalue::Qtm; // ✅ delegate forensic truth
 pub const PURPOSE_44: u128 = 44;
@@ -120,17 +120,20 @@ impl QP44Wallet {
         let sigma = self.manifold.structural_value();
         let before_dim = self.manifold.dimension();
 
-        // ✅ 1. retain FIRST
-        retain(&mut self.manifold, total_mass);
-
+       
         let qp = crate::protocol_id::QuantumId.quantum_seed(
             crate::economic_gate::verify_balance(1, 1)
                 .expect("Economic gate failed"),
         );
 
+        let mass = total_mass;
+        let to = 0;
+
+         // ✅ 1. retain FIRST
+        retain(&mut self.manifold, mass, to);
 
         // ✅ 2. transition
-        let gravity = transition(&mut self.manifold, &qp);
+        let gravity = transition(&mut self.manifold, &Retain { mass, to }, &qp);
         let after_dim = self.manifold.dimension();
 
         // ✅ 3. compute work
@@ -180,19 +183,21 @@ impl QP44Wallet {
     }
 
 
-fn retain(
-    manifold: &mut QuantPerm,
-    mass: u128,
-) {
-    manifold.retain(mass);
-}
-
-fn transition(
-    manifold: &mut QuantPerm,
-    seed: &[u8; 32],
-) -> TransitionHeritage {
-    manifold.transition(Some(seed))
-}
+    fn retain(
+        manifold: &QuantPerm,
+        mass: u128,
+        to: Dimension,
+    ) -> Retain {
+        manifold.retain(mass, to)
+    }
+    
+    fn transition(
+        manifold: &mut QuantPerm,
+        retain: &Retain,
+        seed: &[u8; 32],
+    ) -> TransitionHeritage {
+        manifold.transition(retain, Some(seed))
+    }
 
 fn calculate_work(
     manifold: &QuantPerm,

@@ -1,6 +1,6 @@
 use crate::qp44::{CoinType, Heritage};
 use quantom_value::QuantPerm;
-use crate::protocolvalue::{Qtm, Value};
+use crate::protocolvalue::{Qtm};
 
 pub struct PathInfo {
     pub path: &'static str,
@@ -42,7 +42,7 @@ impl PathsRegistry {
 // 🔹 Economic resolution (NOT registry concern, but acceptable helper)
 pub fn resolve_value(
     heritage: &Heritage,
-) -> Value {
+) -> Qtm {
     Qtm::economy(heritage)
 }
 }

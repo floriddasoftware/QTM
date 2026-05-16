@@ -5,6 +5,8 @@ use crate::protocol_id::QuantumId;
 use crate::qp44::Heritage;
 use blake3;
 
+
+
 #[derive(Debug)]
 pub struct Value {
     pub dimension: Dimension,
@@ -22,24 +24,52 @@ pub struct Qtm {
     pub sigma: u128,
 }
 
+#[repr(C)]
+#[derive(Debug)]
+pub struct Eco {
+    pub value: Value,
+    pub net_work: u128,
+    pub gross_work: u128,
+}
 
 impl Qtm {
     pub fn economy(
         heritage: &Heritage,
-    ) -> Value {
-        
+    ) -> Qtm {
+    
         let protocol = QuantumId::new();
-
-        // 🔹 Build observation directly from Heritage
+    
+        let gross_work = heritage.transition.gross_work;
+        let net_work = heritage.transition.net_work;
+    
+        // 🔹 Build observation directly from live manifold
         let obs = DimensionObservation {
             dimension: heritage.state.dimension(),
             structural_value: heritage.state.structural_value(),
             activations: heritage.state.activations(),
             seed: heritage.transition.origin,
-               };
-
-        Self::from_observation(&obs, &protocol)
+        };
+    
+        // 🔹 Inert economic value projection
+        let value = Self::from_observation(&obs, &protocol);
+    
+        // 🔹 Economic layer
+        let _eco = Eco {
+            value,
+            net_work,
+            gross_work,
+        };
+    
+        // 🔹 Commit directly from live manifold geometry
+        Qtm::commit(
+            heritage.state,
+            net_work,
+        )
     }
+
+           
+
+            
 
     /// Build a ValueSlice from an observation
     pub fn from_observation(
@@ -112,4 +142,4 @@ impl Qtm {
                 sigma,
             }
         }
-    }
+}
