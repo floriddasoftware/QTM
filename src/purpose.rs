@@ -137,7 +137,7 @@ pub enum SeedSource {
 pub struct Purpose;
 
 impl Purpose {
-    pub fn quantperm_from_seed(
+    pub fn quantperm_seed(
         input: SeedSource,
     ) -> Result<QuantPerm, String> {
         let entropy = match input {
@@ -260,6 +260,6 @@ impl QuantPermBuilder {
 
     pub fn build(self) -> Result<QuantPerm, String> {
         let source = self.source.ok_or("Missing seed")?;
-        Purpose::quantperm_from_seed(source)
+        Purpose::quantperm_seed(source)
     }
 }

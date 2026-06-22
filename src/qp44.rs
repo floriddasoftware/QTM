@@ -1,180 +1,198 @@
 // src/qp44.rs
 
-use quantom_value::{QuantPerm, Dimension, Retain, TransitionHeritage};
+use quantom_value::{QuantPerm, Heritage};
 use crate::purpose::{Purpose as SeedPurpose, SeedSource};
-use crate::protocolvalue::Qtm; // ✅ delegate forensic truth
-pub const PURPOSE_44: u128 = 44;
-pub const HARDENED_OFFSET: u128 = 0x8000_0000;
+use crate::protocolvalue::Qtm;
+use crate::pathsregistry::{CoinType, Purpose, WalletOutput,
+    PURPOSE_44,
+    HARDENED_OFFSET,
+};
 
-// ─────────────────────────────────────────────
-// 🔹 Coin Types
-// ─────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CoinType {
-    Bitcoin  = 0,
-    Ethereum = 60,
-    Tron     = 195,
-    Solana   = 501,
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TotalMass {
+    pub purpose: u128,
+    pub coin: u128,
+    pub account: u128,
+    pub change: u128,
+    pub external: u128,
 }
-
-impl CoinType {
-    pub fn retained_mass(self) -> u128 {
-        self as u128
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            CoinType::Bitcoin => "Bitcoin",
-            CoinType::Ethereum => "Ethereum",
-            CoinType::Tron => "Tron",
-            CoinType::Solana => "Solana",
-        }
-    }
-
-    pub fn all() -> &'static [CoinType] {
-        &[
-            CoinType::Bitcoin,
-            CoinType::Ethereum,
-            CoinType::Solana,
-            CoinType::Tron,
-        ]
-    }
-}
-
-// ─────────────────────────────────────────────
-// 🔹 Purpose
-// ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Copy)]
-pub enum Purpose {
-    BIP44,
-    BIP32,
-    Custom(u32),
-}
-
-impl Purpose {
-    pub fn value(self) -> u128 {
-        match self {
-            Purpose::BIP44 => 44,
-            Purpose::BIP32 => 32,
-            Purpose::Custom(v) => v as u128,
-        }
-    }
-}
-
-// ─────────────────────────────────────────────
-// 🔹 Wallet Output (Public API)
-// ─────────────────────────────────────────────
-
-#[derive(Debug, Clone)]
-pub struct WalletOutput {
-    pub coin: CoinType,
-    pub coordinate: [u8; 32],
-    pub commitment: [u8; 32],
-}
-
 // ─────────────────────────────────────────────
 // 🔹 Internal HD State Output (FOR FORENSICS)
 // ─────────────────────────────────────────────
-
 #[repr(C)]
-pub struct QP44Event<'a> {
-    pub heritage: Heritage<'a>,
-    pub qtm: Qtm,
+pub enum Flow {
+    /// External mass entering the manifold.
+    Receive,
+    /// Internal network decay.
+    Change,
 }
 
 #[repr(C)]
-pub struct Heritage<'a> {
-    pub state: &'a QuantPerm,
-    pub transition: TransitionHeritage,
+pub struct QP44Event {
+    pub heritage: Heritage,
+    pub qtm: Qtm,
+}
+#[repr(C)]
+#[derive(Debug)]
+pub struct PQ44Object {
+    pub qtm: Qtm,
+}
+pub struct PQ44Event {
+    pub heritage: Heritage,
+    pub qtm: Qtm,
+}
+
+pub struct Memorize {
+    pub heritage: Heritage,
 }
 // ─────────────────────────────────────────────
 // 🔹 Stateful Wallet Engine
 // ─────────────────────────────────────────────
 
-pub struct QP44Wallet {
-    manifold: QuantPerm,
-    external: u32,
-    coin: CoinType,
+pub struct QP44Object {
+    pub manifold: QuantPerm,
+    pub coin: u128,
 }
 
-impl QP44Wallet {
-    pub fn from_quantperm(
-        mut manifold: QuantPerm,
-        coin: CoinType,
-        external: u32,
-    ) -> Self {
-        manifold.set_initial_dimension_from_perm();
-        Self { manifold, coin, external }
+impl Flow {
+    pub fn stream(self, heritage: &Heritage)->(u128, u128){
+        match self{Flow::Receive => {
+            let external = heritage.state.activations() as u128;
+            (external, 0u128)
+        }
+            Flow::Change => {
+                let change = heritage.transition.delta;
+                (0u128, change)
+            }
+    }
+ }
+}
+impl TotalMass {
+
+    pub fn new(
+        purpose: u128,
+        coin: u128,
+        account: u128,
+        change: u128,
+        external: u128,
+    ) -> Self {Self {purpose, coin, account, change, external,
+        }
     }
 
-    fn realize(&mut self, change: u32) -> QP44Event<'_> {
-        let total_mass =
-            (PURPOSE_44 + HARDENED_OFFSET) +
-            (self.coin.retained_mass() + HARDENED_OFFSET) +
-            (0 + HARDENED_OFFSET) +
-            (change as u128) +
-            (self.external as u128);
+    pub fn realize(&self) -> u128 {
 
-        let sigma = self.manifold.structural_value();
-        let before_dim = self.manifold.dimension();
+        self.purpose.saturating_add(HARDENED_OFFSET)
+            .saturating_add(
+                self.coin.saturating_add(HARDENED_OFFSET)
+            )
+            .saturating_add(
+                self.account.saturating_add(HARDENED_OFFSET)
+            )
+            .saturating_add(self.change)
+            .saturating_add(self.external)
+    }
 
-       
-        let qp = crate::protocol_id::QuantumId.quantum_seed(
-            crate::economic_gate::verify_balance(1, 1)
-                .expect("Economic gate failed"),
-        );
 
-        let mass = total_mass;
-        let to = 0;
-
-         // ✅ 1. retain FIRST
-        retain(&mut self.manifold, mass, to);
-
-        // ✅ 2. transition
-        let gravity = transition(&mut self.manifold, &Retain { mass, to }, &qp);
-        let after_dim = self.manifold.dimension();
-
-        // ✅ 3. compute work
-        let (tau, delta, gross_work, net_work) =
-            calculate_work(
-                &self.manifold,
-                &qp,
-                before_dim,
-                after_dim,
-                sigma,
-            );
-            let heritage = Heritage {
-                state: &self.manifold,
-                transition: TransitionHeritage {
-                    tau,
-                    delta,
-                    gross_work,
-                    net_work,
-                    origin: gravity.origin,
-                },
-            };
+    pub fn from_memorized(
+        purpose: u128,
+        coin: u128,
+        account: u128,
+        change: u128,
+        external: u128,
+    ) -> Self {
+        Self {
+            purpose,
+            coin,
+            account,
+            change,
+            external,
+        }
+    }
     
-            // 🔥 Commit 
-            let qtm = Qtm::commit(
-                heritage.state,
-                heritage.transition.net_work,
-            );
+    pub fn memorize(&self) -> u128 {
+        self.purpose.saturating_sub(HARDENED_OFFSET)
+            .saturating_add(
+                self.coin.saturating_sub(HARDENED_OFFSET)
+            )
+            .saturating_add(
+                self.account.saturating_sub(HARDENED_OFFSET)
+            )
+            .saturating_add(self.change)
+            .saturating_add(self.external)
+}
+}
+
+impl QP44Object {
+    pub fn from_quantperm(
+        manifold: QuantPerm,
+        coin: u128,
+    ) -> Self {
+        Self { manifold, coin}
+    }
+
+
+
+        pub fn realize(self) -> QP44Event {
     
-            QP44Event { heritage, qtm }
+            let mut manifold = self.manifold;
+
+            let external = manifold.activations();
+    
+            manifold.set_initial_dimension_from_perm();
+    
+            let total_mass =
+                TotalMass::new(
+                    PURPOSE_44,
+                    self.coin,
+                    0,
+                    0,
+                    external as u128,
+                );
+    
+            let mass =
+                total_mass.realize();
+    
+            let before_dim =
+                manifold.dimension();
+    
+            let qp =
+                crate::protocol_id::QuantumId.quantum_seed(
+                    crate::economic_gate::verify_balance(0, 0)
+                        .expect("Economic gate failed"),
+                );
+    
+            let retain =
+                manifold.retain(
+                    mass,
+                    before_dim,
+                );
+    
+            let heritage =
+                manifold.transition(
+                    &retain,
+                    Some(&qp),
+                );
+    
+            let qtm =
+                Qtm::commit(
+                    &heritage.state,
+                    heritage.transition.net_work,
+                );
+    
+            QP44Event {
+                heritage,
+                qtm,
+            }
         }
     
-        pub fn next_receive(&mut self) -> QP44Event<'_> {
-            self.realize(0)
+        pub fn next_receive(self) -> QP44Event {
+            self.realize()
         }
     
-        pub fn next_change(&mut self) -> QP44Event<'_> {
-            self.realize(1)
-        }
-    
-        pub fn replay(&mut self, index: u32) {
-            self.external = index;
+        pub fn next_change(self) -> QP44Event {
+            self.realize()
         }
     
         pub fn into_manifold(self) -> QuantPerm {
@@ -183,43 +201,96 @@ impl QP44Wallet {
     }
 
 
-    fn retain(
-        manifold: &QuantPerm,
-        mass: u128,
-        to: Dimension,
-    ) -> Retain {
-        manifold.retain(mass, to)
-    }
+
+    impl QP44Event {
+
+        pub fn memorize(
+            self,
+            flow: Flow,
+        ) -> QP44Event {
     
-    fn transition(
-        manifold: &mut QuantPerm,
-        retain: &Retain,
-        seed: &[u8; 32],
-    ) -> TransitionHeritage {
-        manifold.transition(retain, Some(seed))
+            let heritage =
+                self.heritage;
+    
+            
+    
+            let (account, change) =
+                flow.stream(&heritage);
+
+            let manifold =
+                heritage.state;
+    
+            let mass =
+                TotalMass::from_memorized(
+                    PURPOSE_44,
+                    heritage.transition.net_work,
+                    account,
+                    change,
+                    manifold.activations() as u128,
+                )
+                .memorize();
+    
+            QP44Object {
+                manifold,
+                coin: mass,
+            }
+            .realize()
+        }
     }
 
-fn calculate_work(
-    manifold: &QuantPerm,
-    seed: &[u8; 32],
-    from_dim: Dimension,
-    to_dim: Dimension,
-    sigma: u128,
-) -> (u128, u128, u128, u128) {
-    let (tau, delta, gross_work) =
-        QuantPerm::calculate_work(
-            manifold.retained_mass(),
-            seed,
-            to_dim,
-            from_dim,
+impl PQ44Object {
+
+    pub fn trigger(
+        heritage: &Heritage,
+        qtm: Qtm,
+    ) -> Self {
+
+        let committed = Qtm::commit(
+            &heritage.state,
+            heritage.transition.net_work,
         );
 
-    let net_work = gross_work.saturating_sub(sigma);
+        assert_eq!(
+            qtm.coordinate,
+            committed.coordinate,
+            "coordinate mismatch",
+        );
 
-    (tau, delta, gross_work, net_work)
+        assert_eq!(
+            qtm.commitment,
+            committed.commitment,
+            "commitment mismatch",
+        );
+
+        Self {
+            qtm,
+        }
+    }
 }
 
 
+//Model 1 — Physical Manifold Model
+
+//This is the invariant physics layer.
+
+//Its job is only to answer:
+
+//Where am I?
+//How much structure exists?
+//How much resistance exists?
+//How much work occurred?
+
+//Pipeline:
+
+//PERM
+//  ↓
+//Euclid
+//  ↓
+//BiasMirror
+//  ↓
+//Gravity
+//  ↓
+//QuantPerm
 // ─────────────────────────────────────────────
 // 🔹 Wallet Request (SDK)
 // ─────────────────────────────────────────────
@@ -232,6 +303,11 @@ pub struct WalletRequest {
     pub index: u32,
 }
 
+//Model 5
+//this code is not a ledger model and not an account model.
+
+//It is a wal_let projection engine that converts deterministic state transitions into
+// commitment-coordinate pairs, which are then consumed by the higher Economic/Structure layers
 // ─────────────────────────────────────────────
 // 🔹 QP44 SDK Engine
 // ─────────────────────────────────────────────
@@ -246,10 +322,10 @@ impl QP44 {
 
         for coin in &request.coins {
             // 🔹 Base manifold from seed
-            let base = SeedPurpose::quantperm_from_seed(request.seed.clone())?;
+            let base = SeedPurpose::quantperm_seed(request.seed.clone())?;
 
             // 🔹 Stateful driver
-            let mut wallet = QP44Wallet::from_quantperm(base, *coin, request.index);
+            let wallet = QP44Object::from_quantperm(base, coin.retained_mass());
 
             // 🔹 Perform transition (THIS produces real state)
             let result = wallet.next_receive();

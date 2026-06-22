@@ -1,0 +1,11 @@
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/zeroize-a4f519ecd34b416c.d: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/aarch64.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/barrier.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/stack.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/../README.md
+
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/libzeroize-a4f519ecd34b416c.rlib: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/aarch64.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/barrier.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/stack.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/../README.md
+
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/libzeroize-a4f519ecd34b416c.rmeta: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/aarch64.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/barrier.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/stack.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/../README.md
+
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/lib.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/aarch64.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/barrier.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/stack.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.0/src/../README.md:

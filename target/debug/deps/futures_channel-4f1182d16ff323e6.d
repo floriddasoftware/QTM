@@ -1,0 +1,10 @@
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/futures_channel-4f1182d16ff323e6.d: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/lock.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/mod.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/queue.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/sink_impl.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/oneshot.rs
+
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/libfutures_channel-4f1182d16ff323e6.rmeta: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/lock.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/mod.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/queue.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/sink_impl.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/oneshot.rs
+
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/lib.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/lock.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/mod.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/queue.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/mpsc/sink_impl.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-channel-0.3.32/src/oneshot.rs:

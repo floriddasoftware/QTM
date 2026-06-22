@@ -25,3 +25,8 @@ sha2 = "0.11"                          # bump to match digest 0.11
 ripemd = "0.2.0"                       # latest stable, also uses digest 0.11
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 bs58 = "0.5"
+clap = { version = "4.5", features = ["derive"] }
+
+[[bin]] 
+name = "qp"
+ path = "src/main.rs"

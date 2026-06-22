@@ -1,0 +1,8 @@
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/httpdate-da10823883f63507.d: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httpdate-1.0.3/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httpdate-1.0.3/src/date.rs
+
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/libhttpdate-da10823883f63507.rlib: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httpdate-1.0.3/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httpdate-1.0.3/src/date.rs
+
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/libhttpdate-da10823883f63507.rmeta: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httpdate-1.0.3/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httpdate-1.0.3/src/date.rs
+
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httpdate-1.0.3/src/lib.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httpdate-1.0.3/src/date.rs:

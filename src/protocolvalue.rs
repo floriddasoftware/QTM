@@ -1,8 +1,8 @@
 // src/protocolvalue.rs
 
-use quantom_value::{QuantPerm, DimensionObservation, Dimension};
+use quantom_value::{QuantPerm, DimensionObservation, Dimension, Heritage};
 use crate::protocol_id::QuantumId;
-use crate::qp44::Heritage;
+use crate::qp44::{TotalMass, Flow, QP44Event, QP44Object};
 use blake3;
 
 
@@ -62,7 +62,7 @@ impl Qtm {
     
         // 🔹 Commit directly from live manifold geometry
         Qtm::commit(
-            heritage.state,
+            &heritage.state,
             net_work,
         )
     }
@@ -93,7 +93,7 @@ impl Qtm {
     pub fn derive_coordinate(manifold: &QuantPerm) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
         h.update(b"QP44::COORD::V1");
-        h.update(&(manifold.dimension() as u64).to_le_bytes());
+        h.update(&manifold.dimension().to_le_bytes());
         h.update(&manifold.structural_value().to_le_bytes());
     
         let hash = h.finalize();
@@ -142,4 +142,117 @@ impl Qtm {
                 sigma,
             }
         }
+}
+
+impl Value {
+    pub fn heritage_value(
+        heritage: &Heritage,
+    ) -> Self {
+        let protocol = QuantumId::new();
+
+        let obs = DimensionObservation {
+            dimension: heritage.state.dimension(),
+            structural_value: heritage.state.structural_value(),
+            activations: heritage.state.activations(),
+            seed: heritage.transition.origin,
+        };
+
+        Qtm::from_observation(
+            &obs,
+            &protocol,
+        )
+    }
+}
+
+//MODEL NETWORK
+//network object
+
+pub struct PQNetEvent {
+    pub heritage: Heritage,
+    pub qtm: Qtm, //<-invirant
+
+}
+
+impl PQNetEvent {
+    pub fn memorize(self, flow: Flow) -> QP44Event {
+
+        let heritage =
+        self.heritage;
+
+    
+
+    let (account, change) =
+        flow.stream(&heritage);
+
+    let manifold =
+        heritage.state;
+
+    let purpose = 1;
+
+    let mass =
+        TotalMass::from_memorized(
+            purpose,
+            heritage.transition.net_work,
+            account,
+            change,
+            manifold.activations() as u128,
+        )
+        .memorize();
+
+
+        QP44Object {
+            manifold,
+            coin: mass,
+        }
+        .realize()
+    }
+
+
+
+    pub fn next_change(self) -> QP44Event {
+        self.memorize(Flow::Change) 
+    }
+}
+
+pub struct PQNetObject {
+    heritage: Heritage,
+    qtm: Qtm,
+}
+
+impl PQNetObject {
+
+    pub fn balance(
+        heritage: Heritage,
+        qtm: Qtm,
+    ) -> Self {
+
+        let committed = Qtm::commit(
+            &heritage.state,
+            heritage.transition.net_work,
+        );
+
+        assert_eq!(
+            qtm.coordinate,
+            committed.coordinate,
+            "coordinate mismatch",
+        );
+
+        assert_eq!(
+            qtm.commitment,
+            committed.commitment,
+            "commitment mismatch",
+        );
+
+        Self {
+            heritage,
+            qtm,
+        }
+    }
+
+    pub fn observe(self) -> PQNetEvent {
+        PQNetEvent {
+            heritage: self.heritage,
+            qtm: self.qtm,
+        }
+    }
 }
