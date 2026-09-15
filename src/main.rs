@@ -39,6 +39,9 @@ enum QtmCommands {
         name: String,
 
         #[arg(long, default_value_t = 0)]
+        activation: u64,
+
+        #[arg(long, default_value_t = 0)]
         purpose: u128,
 
         #[arg(long, default_value_t = 0)]
@@ -84,6 +87,7 @@ fn main() {
             }
     
             QtmCommands::Transit {
+                activation,
                 name,
                 purpose,
                 coin,
@@ -92,17 +96,20 @@ fn main() {
                 external,
             } => {
     
-                let payload = TotalMass::new(
+                let mass = TotalMass::new(
                     purpose,
                     coin,
                     account,
                     change,
                     external,
                 );
-    
+                
+                let payload: u128 = mass.memorize();
+                
                 commands::qtm_transit(
                     &name,
                     payload,
+                    activation,
                 );
             }
     

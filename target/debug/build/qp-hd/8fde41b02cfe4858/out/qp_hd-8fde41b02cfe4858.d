@@ -1,0 +1,13 @@
+/Users/floridda/Documents/QP HD WALLET/target/debug/build/qp-hd/8fde41b02cfe4858/out/qp_hd-8fde41b02cfe4858.d: src/lib.rs src/qp44.rs src/purpose.rs src/protocolvalue.rs src/protocol_id.rs src/pathsregistry.rs src/config.rs src/economic_gate.rs src/commands.rs
+
+/Users/floridda/Documents/QP HD WALLET/target/debug/build/qp-hd/8fde41b02cfe4858/out/libqp_hd-8fde41b02cfe4858.rmeta: src/lib.rs src/qp44.rs src/purpose.rs src/protocolvalue.rs src/protocol_id.rs src/pathsregistry.rs src/config.rs src/economic_gate.rs src/commands.rs
+
+src/lib.rs:
+src/qp44.rs:
+src/purpose.rs:
+src/protocolvalue.rs:
+src/protocol_id.rs:
+src/pathsregistry.rs:
+src/config.rs:
+src/economic_gate.rs:
+src/commands.rs:

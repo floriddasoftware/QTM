@@ -36,7 +36,7 @@ impl QuantumId {
         if obs.activations == 0 {
             None
         } else {
-            Some(obs.structural_value / obs.activations as u128)
+            Some(obs.structural_value / obs.activations as u128 /obs.structural_value )
         }
     }
 
@@ -70,7 +70,8 @@ impl QuantumId {
 }
 
 /// A structural slice that is economically locked under quantum identity.
-#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LockedStructure {
     pub dimension: u64,
     pub structural_value: u128,

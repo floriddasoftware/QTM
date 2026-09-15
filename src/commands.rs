@@ -1,14 +1,12 @@
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, u64};
+use std::path::{Path, PathBuf};
 
-use quantom_value::{Perm, QuantPerm, Heritage, TransitionHeritage, SeedType};
+use quantom_value::{Perm, QuantPerm, Heritage, TransitionHeritage};
 use crate::protocolvalue::Qtm;
 use crate::qp44::{
-    QP44Object, 
-    PQ44Object, 
+    QP44Object,  
     QP44Event, 
-    PQ44Event, 
-    TotalMass,
+    PQ44Event 
 };
 pub trait HeritageEvent {
     fn heritage(&self) -> &Heritage;
@@ -36,7 +34,7 @@ impl HeritageEvent for PQ44Event {
 }
 
 pub fn persist_heritage<E>(
-    path: &PathBuf,
+    substrate: &Path,
     event: &E,
 )
 where
@@ -45,8 +43,11 @@ where
     let heritage = event.heritage();
     let qtm = event.qtm();
 
-    fs::create_dir_all(path)
-        .expect("failed to create heritage path");
+    let path = substrate_root()
+        .join(substrate);
+
+    fs::create_dir_all(&path)
+        .expect("failed to create substrate heritage path");
 
     fs::write(
         path.join("manifold.dimension"),
@@ -70,9 +71,7 @@ where
 
     fs::write(
         path.join("transition.mirror"),
-        hex::encode(
-            heritage.transition.mirror_bytes
-        ),
+        hex::encode(heritage.transition.mirror_bytes),
     ).ok();
 
     fs::write(
@@ -96,11 +95,6 @@ where
     ).ok();
 
     fs::write(
-        path.join("transition.origin"),
-        format!("{:?}", heritage.transition.origin),
-    ).ok();
-
-    fs::write(
         path.join("qtm.commitment"),
         hex::encode(qtm.commitment),
     ).ok();
@@ -121,11 +115,9 @@ where
     ).ok();
 }
 
-fn substrate_root() -> PathBuf {
-
-    let home =
-        std::env::var("HOME")
-            .expect("HOME not set");
+pub fn substrate_root() -> PathBuf {
+    let home = std::env::var("HOME")
+        .expect("HOME not set");
 
     PathBuf::from(home)
         .join(".qp")
@@ -168,6 +160,9 @@ pub fn qtm_create(
 
     fs::create_dir_all(&path)
         .expect("failed to create substrate");
+
+    fs::create_dir_all(path.join("events"))
+        .expect("failed to create substrate events path");
 
     // --------------------------------------------------
     // 🔹 Domain Indices
@@ -418,13 +413,13 @@ pub fn load_qtm(
 
 pub fn load_qtm_at_activation(
     substrate: &str,
-    activation: u64,
+    activation:u64,
 ) -> Qtm {
 
     let heritage =
         qtm_open_manifold_until(
             substrate,
-            Some(activation),
+            activation,
         );
 
     Qtm::economy(&heritage)
@@ -575,19 +570,25 @@ pub fn qtm_open_manifold(
 
     qtm_open_manifold_until(
         substrate,
-        None,
+        u64::MAX,
     )
 }
 
+
+
+
 pub fn qtm_open_manifold_until(
     substrate: &str,
-    stop_activation: Option<u64>,
+    stop_activation: u64,
 ) -> Heritage {
 
     let root =
         substrate_root()
             .join(substrate);
 
+    //
+    // Reconstruct canonical PERM.
+    //
     let indices_raw =
         fs::read_to_string(
             root.join("perm.indices")
@@ -600,17 +601,23 @@ pub fn qtm_open_manifold_until(
         )
         .expect("missing perm.entropy");
 
-    let indices: [u16; Perm::NUM_INDICES] =
+
+
+    let indices:
+        [u16; Perm::NUM_INDICES] =
         indices_raw
             .trim()
             .split(',')
-            .map(|v| {
-                v.parse::<u16>()
-                    .expect("invalid index")
-            })
+            .map(
+                |v|
+                    v.parse::<u16>()
+                        .expect("invalid index")
+            )
             .collect::<Vec<_>>()
             .try_into()
             .expect("invalid index count");
+
+
 
     let perm =
         Perm::genesis_construct(
@@ -621,99 +628,107 @@ pub fn qtm_open_manifold_until(
             "failed to reconstruct PERM"
         );
 
+
+
     let mut manifold =
-        QuantPerm::new(perm);
+        QuantPerm::new(
+            perm
+        );
 
     manifold
         .set_initial_dimension_from_perm();
 
-    let events_root =
-        root.join("events");
 
-    let mut events: Vec<_> =
-        fs::read_dir(&events_root)
-            .expect("failed to read events")
-            .filter_map(|e| e.ok())
-            .collect();
-
-    events.sort_by_key(
-        |e| e.file_name()
-    );
 
     let mut heritage =
         Heritage {
-            state: manifold,
-            transition: TransitionHeritage {
-                tau: 0,
-                delta: 0,
-                gross_work: 0,
-                net_work: 0,
-                origin: SeedType::Euclid,
-                mirror_bytes: [0u8; 32],
-            },
+
+            state:
+                manifold,
+
+            transition:
+                TransitionHeritage {
+
+                    tau: 0,
+
+                    delta: 0,
+
+                    gross_work: 0,
+
+                    net_work: 0,
+
+                    mirror_bytes: [0u8; 32],
+                },
         };
 
-    for entry in events {
 
-        if let Some(target) =
-            stop_activation
-        {
-            if heritage
+
+    //
+    // Pure manifold replay.
+    //
+    // Activation drives the replay,
+    // not the filesystem.
+    //
+    while
+        heritage
+            .state
+            .activations()
+            < stop_activation
+    {
+
+        let retained_mass =
+            heritage
                 .state
-                .activations()
-                >= target
-            {
-                break;
-            }
-        }
+                .retained_mass();
 
-        let path =
-            entry.path();
 
-        let name =
-            entry.file_name()
-                .to_string_lossy()
-                .to_string();
 
-        if name.starts_with(
-            "event_"
-        ) {
+        let event =
+            QP44Object::from_quantperm(
+                heritage.state,
+                retained_mass,
+            )
+            .next_receive();
 
-            let retained_mass: u128 =
-                fs::read_to_string(
-                    path.join(
-                        "manifold.retained_mass"
-                    )
-                )
-                .expect(
-                    "missing manifold.retained_mass"
-                )
-                .trim()
-                .parse()
-                .expect(
-                    "invalid manifold.retained_mass"
-                );
 
-            let event =
-                QP44Object::from_quantperm(
-                    heritage.state,
-                    retained_mass,
-                )
-                .next_receive();
 
-            heritage =
-                event.heritage;
+        heritage =
+            event.heritage;
+    }
 
-            } else if name.starts_with("exile_") {
 
-                let qtm =
-                    load_qtm(&path);
-            
-                PQ44Object::trigger(
-                    &heritage,
-                    qtm,
-                );
-            }
+
+    heritage
+}
+
+
+pub fn qtm_close_manifold_until(
+    mut heritage: Heritage,
+    stop_activation: u64,
+) -> Heritage {
+
+    while heritage.state.activations() > stop_activation {
+
+        heritage =
+            heritage
+                .state
+                .exile();
+    }
+
+    heritage
+}
+
+pub fn qtm_close_heritage_until(
+    mut heritage: Heritage,
+    stop_activation: u64,
+) -> Heritage {
+
+    while heritage.state.activations() > stop_activation {
+
+        heritage =
+            heritage
+                .state
+                .exile();
     }
 
     heritage
@@ -721,25 +736,27 @@ pub fn qtm_open_manifold_until(
 
 
 
+
      pub fn qtm_transit(
         substrate: &str,
-        payload: TotalMass,
+        payload: u128,
+        amount: u64,
     ) -> QP44Event {
+
+        let activation = amount;
+
+        
+        let heritage = qtm_open_manifold_until(substrate, activation);
+
+
+        let manifold = heritage.state;
     
-        let heritage =
-            qtm_open_manifold(substrate);
-    
-        let _qtm =
-            load_latest_qtm(substrate);
-    
-        let manifold =
-            heritage.state;
-    
+        
     
             let object =
             QP44Object::from_quantperm(
                 manifold,
-                payload.coin,
+                payload,
             );
     
         let new_event =
@@ -778,51 +795,213 @@ pub fn qtm_open_manifold_until(
     }
 
 
-pub fn qtm_exile(
-    substrate: &str,
-) -> QP44Event {
-
-    let heritage =
-        qtm_open_manifold(substrate);
-
-    let qtm =
-        load_latest_qtm(substrate);
-
-    let event =
-        QP44Event {
-            heritage,
-            qtm,
-        };
-       
-
-    let activation =
-        event
-            .heritage
-            .state
-            .activations();
-
-    let dimension =
-        event
-            .heritage
-            .state
-            .dimension();
-
-    let path =
-        substrate_root()
-            .join(substrate)
-            .join("events")
-            .join(
-                format!(
-                    "exile_{}_{}",
-                    activation,
-                    dimension,
-                )
+    pub fn qtm_exile(
+        substrate: &str,
+    ) -> PQ44Event {
+    
+        //
+        // Recover canonical manifold.
+        //
+        let heritage =
+            qtm_open_manifold(
+                substrate,
             );
+    
+        //
+        // Recover canonical QTM.
+        //
+        let qtm =
+            load_latest_qtm(
+                substrate,
+            );
+    
+        //
+        // Materialize balance event.
+        //
+        let event =
+            PQ44Event::balance(
+                heritage,
+                &qtm,
+            );
+    
+        let activation =
+            event
+                .heritage
+                .state
+                .activations();
+    
+        let dimension =
+            event
+                .heritage
+                .state
+                .dimension();
+    
+        //
+        // Resolve the transit event being exiled.
+        //
+        let transit_path =
+            event_path_at_activation(
+                substrate,
+                activation.saturating_add(1),
+            );
+    
+        //
+        // Persist exile record.
+        //
+        let exile_path =
+            substrate_root()
+                .join(substrate)
+                .join("events")
+                .join(
+                    format!(
+                        "exile_{}_{}",
+                        activation,
+                        dimension,
+                    )
+                );
+    
+        persist_heritage(
+            &exile_path,
+            &event,
+        );
+    
+        //
+        // Remove the corresponding transit event.
+        //
+        if let Some(path) = transit_path {
+    
+            println!(
+                "EXILING {}",
+                path.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+            );
+    
+            fs::remove_dir_all(
+                &path,
+            )
+            .expect(
+                "failed to remove transit event",
+            );
+        }
+    
+        println!(
+            "ACTIVATIONS AFTER EXILE = {}",
+            qtm_open_manifold(
+                substrate,
+            )
+            .state
+            .activations()
+        );
+    
+        event
+    }
 
-    persist_heritage(
-        &path,
-        &event,
-    );
 
-    event
-}
+    fn activation_from_name(
+        name: &str,
+    ) -> Option<u64> {
+    
+        let rest =
+            name
+                .strip_prefix("event_")
+                .or_else(|| name.strip_prefix("exile_"))?;
+    
+        rest.split('_')
+            .next()?
+            .parse::<u64>()
+            .ok()
+    }
+    pub fn event_path_at_activation(
+        substrate: &str,
+        activation: u64,
+    ) -> Option<PathBuf> {
+    
+        let events_root =
+            substrate_root()
+                .join(substrate)
+                .join("events");
+    
+        fs::read_dir(events_root)
+            .ok()?
+            .filter_map(Result::ok)
+            .find_map(|entry| {
+    
+                let name =
+                    entry
+                        .file_name()
+                        .to_string_lossy()
+                        .to_string();
+    
+                if !name.starts_with("event_") {
+                    return None;
+                }
+    
+                match activation_from_name(&name) {
+                    Some(a) if a == activation => {
+                        Some(entry.path())
+                    }
+    
+                    _ => None,
+                }
+            })
+    }
+    
+
+    pub enum PersistedEvent {
+        Transit(QP44Event),
+        Exile(PQ44Event),
+    }
+    
+    pub fn load_event_at_activation(
+        substrate: &str,
+        activation: u64,
+    ) -> PersistedEvent {
+    
+        let path =
+            event_path_at_activation(
+                substrate,
+                activation,
+            )
+            .expect("event not found");
+    
+        let name =
+            path.file_name()
+                .unwrap()
+                .to_string_lossy();
+    
+        let heritage =
+            qtm_open_manifold_until(
+                substrate,
+                activation,
+            );
+    
+        let qtm =
+            load_qtm(&path);
+    
+        if name.starts_with("event_") {
+    
+            PersistedEvent::Transit(
+                QP44Event {
+                    heritage,
+                    qtm,
+                }
+            )
+    
+        } else if name.starts_with("exile_") {
+    
+            PersistedEvent::Exile(
+                PQ44Event {
+                    heritage,
+                    qtm,
+                }
+            )
+    
+        } else {
+    
+            panic!(
+                "unknown persisted event namespace: {}",
+                name,
+            );
+        }
+    }

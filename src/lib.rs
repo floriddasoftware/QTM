@@ -15,3 +15,4 @@ pub use protocolvalue::{Qtm};
 pub use pathsregistry::PathsRegistry;
 pub use economic_gate::*;
 pub use commands::*;
+pub use qtm_graph;

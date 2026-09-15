@@ -1,0 +1,13 @@
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/uuid-539fc2eb33528be4.d: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/macros.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/builder.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/error.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/non_nil.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/parser.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/fmt.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/timestamp.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/external.rs
+
+/Users/floridda/Documents/QP HD WALLet/target/debug/deps/libuuid-539fc2eb33528be4.rmeta: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/macros.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/builder.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/error.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/non_nil.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/parser.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/fmt.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/timestamp.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/external.rs
+
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/lib.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/macros.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/builder.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/error.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/non_nil.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/parser.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/fmt.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/timestamp.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uuid-1.24.0/src/external.rs:

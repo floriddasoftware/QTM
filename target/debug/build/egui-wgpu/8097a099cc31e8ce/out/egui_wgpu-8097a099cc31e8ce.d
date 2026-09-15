@@ -1,0 +1,11 @@
+/Users/floridda/Documents/QP HD WALLET/target/debug/build/egui-wgpu/8097a099cc31e8ce/out/egui_wgpu-8097a099cc31e8ce.d: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/renderer.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/setup.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/capture.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/winit.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/egui.wgsl /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/texture_copy.wgsl
+
+/Users/floridda/Documents/QP HD WALLET/target/debug/build/egui-wgpu/8097a099cc31e8ce/out/libegui_wgpu-8097a099cc31e8ce.rmeta: /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/lib.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/renderer.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/setup.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/capture.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/winit.rs /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/egui.wgsl /Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/texture_copy.wgsl
+
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/lib.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/renderer.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/setup.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/capture.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/winit.rs:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/egui.wgsl:
+/Users/floridda/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-wgpu-0.35.0/src/texture_copy.wgsl:
