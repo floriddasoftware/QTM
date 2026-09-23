@@ -3268,6 +3268,7 @@ dependencies = [
 [[package]]
 name = "qtm-graph"
 version = "0.1.0"
+source = "git+https://github.com/floriddasoftware/Quantum-Economies#0169dbb306e15d55095b9fd6f2f345b61b09a41d"
 dependencies = [
  "eframe",
  "hex",

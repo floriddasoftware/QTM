@@ -1,1 +1,3 @@
-.envtarget/
+.env
+target/
+qtm.txt

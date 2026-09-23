@@ -1,1 +1,0 @@
-{"$message_type":"unused_extern","lint_level":"force-warn","unused_extern_names":["bip39","blake3","bs58","dotenv","ed25519_dalek","futures","hex","k256","qtm_graph","quantom_value","reqwest","ripemd","serde","serde_json","sha2","thiserror","tiny_keccak","tokio"]}
