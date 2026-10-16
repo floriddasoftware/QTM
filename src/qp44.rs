@@ -34,15 +34,20 @@ pub enum Flow {
 pub struct QP44Event {
     pub heritage: Heritage,
     pub qtm: Qtm,
+    pub depth: Depth,
 }
+
 #[repr(C)]
 pub struct PQ44Object {
     pub manifold: QuantPerm,
-    pub coin: u128, 
+    pub coin: u128,
 }
+
+#[repr(C)]
 pub struct PQ44Event {
     pub heritage: Heritage,
     pub qtm: Qtm,
+    pub depth: Depth,
 }
 
 pub struct Memorize {
@@ -72,14 +77,19 @@ impl Flow {
 }
 
 impl TotalMass {
-
     pub fn new(
         purpose: u128,
         coin: u128,
         account: u128,
         change: u128,
         external: u128,
-    ) -> Self {Self {purpose, coin, account, change, external,
+    ) -> Self {
+        Self {
+            purpose,
+            coin,
+            account,
+            change,
+            external,
         }
     }
 
@@ -134,7 +144,6 @@ impl TotalMass {
         depth
     }
 
-
     pub fn from_memorized(
         purpose: u128,
         coin: u128,
@@ -150,18 +159,19 @@ impl TotalMass {
             external,
         }
     }
-    
+
     pub fn memorize(&self) -> u128 {
-        self.purpose.saturating_sub(HARDENED_OFFSET)
+        self.purpose
+            .saturating_sub(HARDENED_OFFSET)
             .saturating_add(
-                self.coin.saturating_sub(HARDENED_OFFSET)
+                self.coin.saturating_sub(HARDENED_OFFSET),
             )
             .saturating_add(
-                self.account.saturating_sub(HARDENED_OFFSET)
+                self.account.saturating_sub(HARDENED_OFFSET),
             )
             .saturating_add(self.change)
             .saturating_add(self.external)
-}
+    }
 }
 
 impl QP44Object {
@@ -172,100 +182,58 @@ impl QP44Object {
         Self { manifold, coin }
     }
 
-    pub fn realize(
-        self,
-    ) -> QP44Event {
+    pub fn realize(self) -> QP44Event {
         let manifold = self.manifold;
-
         let external = manifold.activations();
 
-        let total_mass =
-            TotalMass::new(
-                PURPOSE_44,
-                self.coin,
-                0,
-                0,
-                external as u128,
-            );
-
-        let retain =
-            total_mass.deep(&manifold,);
-
-
-        let qp =
-            crate::protocol_id::QuantumId.quantum_seed(
-                crate::economic_gate::verify_balance(0, 0)
-                    .expect("Economic gate failed"),
-            );
-
-        // ---------------------------------------------------------------------
-        // GRAPH IS THE ONLY TRANSITION GATE.
-        //
-        // QP-HD does not call Quantom-VALUE::transition() directly.
-        // ---------------------------------------------------------------------
-        let heritage =
-            qtm_graph::graph::frame::Direction::transit(
-                manifold,
-                &retain,
-                Some(&qp),
-            );
-
-        let event_map =
-            qtm_graph::graph::frame::EventMap::now(
-                heritage,
-                qtm_graph::graph::scale::Scale::Global,
-            );
-
-        // ---------------------------------------------------------------------
-        // LOCAL OBSERVER
-        //
-        // Dashboard is intentionally created here so existing QP44 callers
-        // require no new dependency or argument.
-        //
-        // Heritage remains the sole authentic transition receipt.
-        // Dashboard only borrows it.
-        // ---------------------------------------------------------------------
-        let mut dashboard =
-            qtm_graph::Dashboard::new();
-
-        dashboard.journey(
-            &event_map,
+        let total_mass = TotalMass::new(
+            PURPOSE_44,
+            self.coin,
+            0,
+            0,
+            external as u128,
         );
 
-        // ---------------------------------------------------------------------
-        // Derived protocol projection.
-        // ---------------------------------------------------------------------
-        let qtm =
-            Qtm::commit(
-                &event_map.heritage().state,
-                event_map.net_work(),
-            );
+        let depth = total_mass.deep(&manifold);
 
-        // ---------------------------------------------------------------------
-        // RETURN THE AUTHENTIC HERITAGE
-        //
-        // EventMap is consumed only after all observers/projections have
-        // finished using it.
-        // ---------------------------------------------------------------------
-        let heritage =
-        event_map.heritage;
+        let qp = crate::protocol_id::QuantumId.quantum_seed(
+            crate::economic_gate::verify_balance(0, 0)
+                .expect("Economic gate failed"),
+        );
 
+        let heritage = qtm_graph::graph::frame::Direction::transit(
+            manifold,
+            &depth,
+            Some(&qp),
+        );
+
+        let event_map = qtm_graph::graph::frame::EventMap::now(
+            heritage,
+            qtm_graph::graph::scale::Scale::Global,
+        );
+
+        let mut dashboard = qtm_graph::Dashboard::new();
+        dashboard.journey(&event_map);
+
+        let qtm = Qtm::commit(
+            &event_map.heritage().state,
+            event_map.net_work(),
+        );
+
+        let heritage = event_map.heritage;
 
         QP44Event {
             heritage,
             qtm,
+            depth,
         }
     }
 
-    pub fn next_receive(
-        self,
-    ) -> QP44Event {
+    pub fn next_receive(self) -> QP44Event {
         self.realize()
     }
 
-    pub fn next_change(
-        self,
-    ) -> QP44Event {
+    pub fn next_change(self) -> QP44Event {
         self.realize()
     }
 
@@ -273,7 +241,6 @@ impl QP44Object {
         self.manifold
     }
 }
-
 
 
     impl QP44Event {
@@ -316,132 +283,101 @@ impl QP44Object {
     }
 
 
-     //MODEL NETWORK
-     //network object
+     
+    // MODEL NETWORK
+// network object
 
-     impl PQ44Event {
-    
-        #[inline(always)]
-        pub fn into_object(self) -> PQ44Object {
-            PQ44Object {
-                manifold: self.heritage.state,
-                coin: self.heritage.transition.net_work,
-            }
+impl PQ44Event {
+    #[inline(always)]
+    pub fn into_object(self) -> PQ44Object {
+        PQ44Object {
+            manifold: self.heritage.state,
+            coin: self.heritage.transition.net_work,
         }
-    
-        pub fn balance(
-            heritage: Heritage,
-            qtm: &Qtm,
-        ) -> PQ44Event {
-            // -------------------------------------------------------------------------
-            // VERIFY INCOMING WITNESS
-            // -------------------------------------------------------------------------
-        
-            let committed =
-                Qtm::commit(
-                    &heritage.state,
-                    heritage.transition.net_work,
-                );
-        
-            assert_eq!(
-                qtm.coordinate,
-                committed.coordinate,
-                "coordinate mismatch",
+    }
+
+    #[inline(always)]
+    pub fn balance(
+        heritage: Heritage,
+        qtm: &Qtm,
+        depth: Depth,
+    ) -> PQ44Event {
+        let committed = Qtm::commit(
+            &heritage.state,
+            heritage.transition.net_work,
+        );
+
+        assert_eq!(
+            qtm.coordinate,
+            committed.coordinate,
+            "coordinate mismatch",
+        );
+
+        assert_eq!(
+            qtm.commitment,
+            committed.commitment,
+            "commitment mismatch",
+        );
+
+        let heritage =
+            qtm_graph::graph::frame::Direction::exile(
+                heritage.state,
             );
-        
-            assert_eq!(
-                qtm.commitment,
-                committed.commitment,
-                "commitment mismatch",
-            );
-        
-            // -------------------------------------------------------------------------
-            // CANONICAL SENDER EXIT
-            //
-            // Graph owns the exile boundary.
-            // -------------------------------------------------------------------------
-        
-            let heritage =
+
+        let qtm = Qtm::commit(
+            &heritage.state,
+            heritage.transition.net_work,
+        );
+
+        PQ44Event {
+            heritage,
+            qtm,
+            depth,
+        }
+    }
+
+    pub fn balance_until(
+        mut heritage: Heritage,
+        qtm: &Qtm,
+        depth: Depth,
+        activation: u64,
+    ) -> PQ44Event {
+        let committed = Qtm::commit(
+            &heritage.state,
+            heritage.transition.net_work,
+        );
+
+        assert_eq!(
+            qtm.coordinate,
+            committed.coordinate,
+            "coordinate mismatch",
+        );
+
+        assert_eq!(
+            qtm.commitment,
+            committed.commitment,
+            "commitment mismatch",
+        );
+
+        while heritage.state.activations() > activation {
+            heritage =
                 qtm_graph::graph::frame::Direction::exile(
                     heritage.state,
                 );
-        
-            // -------------------------------------------------------------------------
-            // NEW RECEIPT AFTER EXILE
-            //
-            // The exile operation itself produces the new Heritage.
-            // -------------------------------------------------------------------------
-        
-            let qtm =
-                Qtm::commit(
-                    &heritage.state,
-                    heritage.transition.net_work,
-                );
-        
-            PQ44Event {
-                heritage,
-                qtm,
-            }
         }
 
+        let qtm = Qtm::commit(
+            &heritage.state,
+            heritage.transition.net_work,
+        );
 
-        pub fn balance_until(
-            mut heritage: Heritage,
-            qtm: &Qtm,
-            activation: u64,
-        ) -> PQ44Event {
-            // -------------------------------------------------------------------------
-            // VERIFY INITIAL WITNESS ONCE
-            // -------------------------------------------------------------------------
-        
-            let committed =
-                Qtm::commit(
-                    &heritage.state,
-                    heritage.transition.net_work,
-                );
-        
-            assert_eq!(
-                qtm.coordinate,
-                committed.coordinate,
-                "coordinate mismatch",
-            );
-        
-            assert_eq!(
-                qtm.commitment,
-                committed.commitment,
-                "commitment mismatch",
-            );
-        
-            // -------------------------------------------------------------------------
-            // REPEATED CANONICAL EXILE
-            //
-            // Every exile passes through the graph boundary.
-            // -------------------------------------------------------------------------
-        
-            while heritage.state.activations() > activation {
-                heritage =
-                    qtm_graph::graph::frame::Direction::exile(
-                        heritage.state,
-                    );
-            }
-        
-            // -------------------------------------------------------------------------
-            // FINAL RECEIPT
-            // -------------------------------------------------------------------------
-        
-            let qtm =
-                Qtm::commit(
-                    &heritage.state,
-                    heritage.transition.net_work,
-                );
-        
-            PQ44Event {
-                heritage,
-                qtm,
-            }
+        PQ44Event {
+            heritage,
+            qtm,
+            depth,
         }
-     }
-    
+    }
+}
     
 
 
