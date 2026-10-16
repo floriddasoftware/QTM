@@ -1,16 +1,28 @@
 use std::{fs, u64};
 use std::path::{Path, PathBuf};
+use std::collections::BTreeMap;
 
-use quantom_value::{Perm, QuantPerm, Heritage, TransitionHeritage};
+use quantom_value::{
+    Perm,
+    QuantPerm,
+    Heritage,
+    TransitionHeritage,
+    Retain,
+};
+
+use qtm_graph::graph::frame::Depth;
+
 use crate::protocolvalue::Qtm;
 use crate::qp44::{
-    QP44Object,  
-    QP44Event, 
-    PQ44Event 
+    QP44Object,
+    QP44Event,
+    PQ44Event,
 };
+
 pub trait HeritageEvent {
     fn heritage(&self) -> &Heritage;
     fn qtm(&self) -> &Qtm;
+    fn depth(&self) -> &Depth;
 }
 
 impl HeritageEvent for QP44Event {
@@ -21,6 +33,10 @@ impl HeritageEvent for QP44Event {
     fn qtm(&self) -> &Qtm {
         &self.qtm
     }
+
+    fn depth(&self) -> &Depth {
+        &self.depth
+    }
 }
 
 impl HeritageEvent for PQ44Event {
@@ -30,6 +46,10 @@ impl HeritageEvent for PQ44Event {
 
     fn qtm(&self) -> &Qtm {
         &self.qtm
+    }
+
+    fn depth(&self) -> &Depth {
+        &self.depth
     }
 }
 
@@ -42,77 +62,148 @@ where
 {
     let heritage = event.heritage();
     let qtm = event.qtm();
+    let depth = event.depth();
 
-    let path = substrate_root()
-        .join(substrate);
+    let path = substrate_root().join(substrate);
 
     fs::create_dir_all(&path)
         .expect("failed to create substrate heritage path");
 
-    fs::write(
-        path.join("manifold.dimension"),
+    let write = |name: &str, value: String| {
+        fs::write(path.join(name), value)
+            .unwrap_or_else(|error| {
+                panic!("failed to persist {}: {}", name, error)
+            });
+    };
+
+    write(
+        "manifold.dimension",
         heritage.state.dimension().to_string(),
-    ).ok();
-
-    fs::write(
-        path.join("manifold.structural_value"),
+    );
+    write(
+        "manifold.structural_value",
         heritage.state.structural_value().to_string(),
-    ).ok();
-
-    fs::write(
-        path.join("manifold.activations"),
+    );
+    write(
+        "manifold.activations",
         heritage.state.activations().to_string(),
-    ).ok();
-
-    fs::write(
-        path.join("manifold.retained_mass"),
+    );
+    write(
+        "manifold.retained_mass",
         heritage.state.retained_mass().to_string(),
-    ).ok();
+    );
 
-    fs::write(
-        path.join("transition.mirror"),
+    write(
+        "transition.mirror",
         hex::encode(heritage.transition.mirror_bytes),
-    ).ok();
-
-    fs::write(
-        path.join("transition.tau"),
+    );
+    write(
+        "transition.tau",
         heritage.transition.tau.to_string(),
-    ).ok();
-
-    fs::write(
-        path.join("transition.delta"),
+    );
+    write(
+        "transition.delta",
         heritage.transition.delta.to_string(),
-    ).ok();
-
-    fs::write(
-        path.join("transition.gross_work"),
+    );
+    write(
+        "transition.gross_work",
         heritage.transition.gross_work.to_string(),
-    ).ok();
-
-    fs::write(
-        path.join("transition.net_work"),
+    );
+    write(
+        "transition.net_work",
         heritage.transition.net_work.to_string(),
-    ).ok();
+    );
 
-    fs::write(
-        path.join("qtm.commitment"),
+    write(
+        "qtm.commitment",
         hex::encode(qtm.commitment),
-    ).ok();
-
-    fs::write(
-        path.join("qtm.coordinate"),
+    );
+    write(
+        "qtm.coordinate",
         hex::encode(qtm.coordinate),
-    ).ok();
-
-    fs::write(
-        path.join("qtm.network"),
+    );
+    write(
+        "qtm.network",
         qtm.net_work.to_string(),
-    ).ok();
-
-    fs::write(
-        path.join("qtm.sigma"),
+    );
+    write(
+        "qtm.sigma",
         qtm.sigma.to_string(),
-    ).ok();
+    );
+
+    write("depth.path", depth.path().to_string());
+
+    let mut entries = depth
+        .objects()
+        .map(|(position, identifier, retain)| {
+            format!(
+                "{}\t{}\t{}\t{}",
+                position,
+                hex::encode(identifier.as_bytes()),
+                retain.mass,
+                retain.from,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    entries.sort_by_key(|entry| {
+        entry
+            .split('\t')
+            .next()
+            .and_then(|position| position.parse::<usize>().ok())
+            .unwrap_or(usize::MAX)
+    });
+
+    write("depth.objects", entries.join("\n"));
+}
+
+pub fn load_depth(
+    path: &Path,
+) -> Depth {
+    let depth_path = fs::read_to_string(path.join("depth.path"))
+        .expect("missing depth.path");
+
+    let mut depth = Depth::new(depth_path.trim_end_matches('\n').to_string());
+
+    let contents = fs::read_to_string(path.join("depth.objects"))
+        .expect("missing depth.objects");
+
+    for (line_number, line) in contents.lines().enumerate() {
+        let fields = line.split('\t').collect::<Vec<_>>();
+
+        if fields.len() != 4 {
+            panic!(
+                "invalid depth.objects entry at line {}",
+                line_number + 1,
+            );
+        }
+
+        let position = fields[0]
+            .parse::<usize>()
+            .expect("invalid depth position");
+
+        let identifier_bytes = hex::decode(fields[1])
+            .expect("invalid depth identifier");
+
+        let identifier = String::from_utf8(identifier_bytes)
+            .expect("depth identifier is not UTF-8");
+
+        let mass = fields[2]
+            .parse::<u128>()
+            .expect("invalid retained mass");
+
+        let from = fields[3]
+            .parse::<u64>()
+            .expect("invalid retained source dimension");
+
+        depth.insert(
+            identifier,
+            position,
+            Retain { mass, from },
+        );
+    }
+
+    depth
 }
 
 pub fn substrate_root() -> PathBuf {
@@ -347,59 +438,41 @@ pub fn qtm_create(
     println!();
 }
 
+
+
 pub fn load_qtm(
     path: &PathBuf,
 ) -> Qtm {
+    let read = |name: &str| {
+        fs::read_to_string(path.join(name))
+            .unwrap_or_else(|error| {
+                panic!("failed to read {}: {}", name, error)
+            })
+    };
 
-    let commitment_hex =
-        fs::read_to_string(
-            path.join("qtm.commitment")
-        )
-        .expect("missing qtm.commitment");
+    let commitment_bytes = hex::decode(read("qtm.commitment").trim())
+        .expect("invalid qtm.commitment");
 
-    let coordinate_hex =
-        fs::read_to_string(
-            path.join("qtm.coordinate")
-        )
-        .expect("missing qtm.coordinate");
+    let coordinate_bytes = hex::decode(read("qtm.coordinate").trim())
+        .expect("invalid qtm.coordinate");
 
-    let net_work =
-        fs::read_to_string(
-            path.join("qtm.network")
-        )
-        .expect("missing qtm.network")
+    let commitment: [u8; 32] = commitment_bytes
+        .try_into()
+        .unwrap_or_else(|_| panic!("qtm.commitment must be exactly 32 bytes"));
+
+    let coordinate: [u8; 32] = coordinate_bytes
+        .try_into()
+        .unwrap_or_else(|_| panic!("qtm.coordinate must be exactly 32 bytes"));
+
+    let net_work = read("qtm.network")
         .trim()
         .parse::<u128>()
         .expect("invalid qtm.network");
 
-    let sigma =
-        fs::read_to_string(
-            path.join("qtm.sigma")
-        )
-        .expect("missing qtm.sigma")
+    let sigma = read("qtm.sigma")
         .trim()
         .parse::<u128>()
         .expect("invalid qtm.sigma");
-
-    let mut commitment =
-        [0u8; 32];
-
-    commitment.copy_from_slice(
-        &hex::decode(
-            commitment_hex.trim()
-        )
-        .expect("invalid qtm.commitment")
-    );
-
-    let mut coordinate =
-        [0u8; 32];
-
-    coordinate.copy_from_slice(
-        &hex::decode(
-            coordinate_hex.trim()
-        )
-        .expect("invalid qtm.coordinate")
-    );
 
     Qtm {
         commitment,
@@ -408,7 +481,6 @@ pub fn load_qtm(
         sigma,
     }
 }
-
 
 
 pub fn load_qtm_at_activation(
@@ -796,107 +868,68 @@ pub fn qtm_close_heritage_until(
 
 
     pub fn qtm_exile(
-        substrate: &str,
-    ) -> PQ44Event {
-    
-        //
-        // Recover canonical manifold.
-        //
-        let heritage =
-            qtm_open_manifold(
-                substrate,
-            );
-    
-        //
-        // Recover canonical QTM.
-        //
-        let qtm =
-            load_latest_qtm(
-                substrate,
-            );
-    
-        //
-        // Materialize balance event.
-        //
-        let event =
-            PQ44Event::balance(
-                heritage,
-                &qtm,
-            );
-    
-        let activation =
-            event
-                .heritage
-                .state
-                .activations();
-    
-        let dimension =
-            event
-                .heritage
-                .state
-                .dimension();
-    
-        //
-        // Resolve the transit event being exiled.
-        //
-        let transit_path =
-            event_path_at_activation(
-                substrate,
-                activation.saturating_add(1),
-            );
-    
-        //
-        // Persist exile record.
-        //
-        let exile_path =
-            substrate_root()
-                .join(substrate)
-                .join("events")
-                .join(
-                    format!(
-                        "exile_{}_{}",
-                        activation,
-                        dimension,
-                    )
-                );
-    
-        persist_heritage(
-            &exile_path,
-            &event,
-        );
-    
-        //
-        // Remove the corresponding transit event.
-        //
-        if let Some(path) = transit_path {
-    
-            println!(
-                "EXILING {}",
-                path.file_name()
-                    .unwrap()
-                    .to_string_lossy()
-            );
-    
-            fs::remove_dir_all(
-                &path,
-            )
-            .expect(
-                "failed to remove transit event",
-            );
-        }
-    
-        println!(
-            "ACTIVATIONS AFTER EXILE = {}",
-            qtm_open_manifold(
-                substrate,
-            )
-            .state
-            .activations()
-        );
-    
-        event
-    }
+    substrate: &str,
+) -> PQ44Event {
+    let heritage = qtm_open_manifold(substrate);
+    let activation = heritage.state.activations();
 
+    let transit_path = event_path_at_activation(
+        substrate,
+        activation,
+    )
+    .unwrap_or_else(|| {
+        panic!(
+            "no persisted transit event for activation {}",
+            activation,
+        )
+    });
+
+    let qtm = load_qtm(&transit_path);
+    let depth = load_depth(&transit_path);
+
+    let event = PQ44Event::balance(
+        heritage,
+        &qtm,
+        depth,
+    );
+
+    let resulting_activation = event.heritage.state.activations();
+    let dimension = event.heritage.state.dimension();
+
+    let exile_path = substrate_root()
+        .join(substrate)
+        .join("events")
+        .join(format!(
+            "exile_{}_{}",
+            resulting_activation,
+            dimension,
+        ));
+
+    persist_heritage(
+        &exile_path,
+        &event,
+    );
+
+    println!(
+        "EXILING {}",
+        transit_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy(),
+    );
+
+    fs::remove_dir_all(&transit_path)
+        .expect("failed to remove transit event");
+
+    println!(
+        "ACTIVATIONS AFTER EXILE = {}",
+        qtm_open_manifold(substrate)
+            .state
+            .activations(),
+    );
+
+    event
+}
 
     fn activation_from_name(
         name: &str,
@@ -953,55 +986,48 @@ pub fn qtm_close_heritage_until(
         Exile(PQ44Event),
     }
     
-    pub fn load_event_at_activation(
-        substrate: &str,
-        activation: u64,
-    ) -> PersistedEvent {
-    
-        let path =
-            event_path_at_activation(
-                substrate,
-                activation,
-            )
-            .expect("event not found");
-    
-        let name =
-            path.file_name()
-                .unwrap()
-                .to_string_lossy();
-    
-        let heritage =
-            qtm_open_manifold_until(
-                substrate,
-                activation,
-            );
-    
-        let qtm =
-            load_qtm(&path);
-    
-        if name.starts_with("event_") {
-    
-            PersistedEvent::Transit(
-                QP44Event {
-                    heritage,
-                    qtm,
-                }
-            )
-    
-        } else if name.starts_with("exile_") {
-    
-            PersistedEvent::Exile(
-                PQ44Event {
-                    heritage,
-                    qtm,
-                }
-            )
-    
-        } else {
-    
-            panic!(
-                "unknown persisted event namespace: {}",
-                name,
-            );
-        }
+pub fn load_event_at_activation(
+    substrate: &str,
+    activation: u64,
+) -> PersistedEvent {
+    let path = event_path_at_activation(
+        substrate,
+        activation,
+    )
+    .unwrap_or_else(|| {
+        panic!("event not found at activation {}", activation)
+    });
+
+    let name = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    let heritage = qtm_open_manifold_until(
+        substrate,
+        activation,
+    );
+
+    let qtm = load_qtm(&path);
+    let depth = load_depth(&path);
+
+    if name.starts_with("event_") {
+        PersistedEvent::Transit(QP44Event {
+            heritage,
+            qtm,
+            depth,
+        })
+    } else if name.starts_with("exile_") {
+        PersistedEvent::Exile(PQ44Event {
+            heritage,
+            qtm,
+            depth,
+        })
+    } else {
+        panic!(
+            "unknown persisted event namespace: {}",
+            name,
+        );
     }
+}
