@@ -1,11 +1,14 @@
-use crate::protocolvalue::{Qtm};
+use crate::protocolvalue::Qtm;
 use crate::qp44::{TotalMass, Flow, QP44Event, QP44Object};
 use crate::protocol_id::QuantumId;
-use crate::pathsregistry::{CoinType};
+use crate::pathsregistry::CoinType;
 use quantom_value::{DimensionObservation, Heritage};
+use qtm_graph::graph::frame::Depth;
 use crate::{
- PQ44Event, PersistedEvent, load_qtm_at_activation, qtm_open_manifold_until
-
+    PQ44Event,
+    PersistedEvent,
+    load_event_at_activation,
+    qtm_open_manifold_until,
 };
 //
 // 🔹 Secure Balance Proof Gate (Sealed)
@@ -233,40 +236,37 @@ pub struct QuantumTransaction {
 
 impl QuantumTransaction {
     pub fn send(
-        substrate: &str,
-        amount: u64,
-    ) -> Self {
+    substrate: &str,
+    amount: u64,
+) -> Self {
+    let activation = amount;
 
-        let activation =
-            amount;
+    let (heritage, qtm, depth) =
+        match load_event_at_activation(substrate, activation) {
+            PersistedEvent::Transit(event) => (
+                event.heritage,
+                event.qtm,
+                event.depth,
+            ),
+            PersistedEvent::Exile(event) => (
+                event.heritage,
+                event.qtm,
+                event.depth,
+            ),
+        };
 
-        let qtm =
-            load_qtm_at_activation(
-                substrate,
-                activation,
-            );
+    let balance = PQ44Event::balance(
+        heritage,
+        &qtm,
+        depth,
+    );
 
-        let heritage =
-            qtm_open_manifold_until(
-                substrate,
-                activation,
-            );
-
-        let balance =
-            PQ44Event::balance(
-                heritage,
-                &qtm,
-            );
-
-        QuantumTransaction {
-            amount: activation,
-            constant:
-                PersistedEvent::Exile(
-                    balance,
-                ),
-            qtm
-        }
+    QuantumTransaction {
+        amount: activation,
+        qtm,
+        constant: PersistedEvent::Exile(balance),
     }
+}
 
 
     #[inline(always)]
