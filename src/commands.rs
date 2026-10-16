@@ -353,6 +353,9 @@ pub fn qtm_create(
         entropy_surface.as_bytes(),
     )
     .expect("failed to write entropy");
+    
+    fs::write(path.join("activation"), "0")
+    .expect("failed to initialize substrate activation");
 
     fs::write(
         path.join("qtm.commitment"),
@@ -438,7 +441,30 @@ pub fn qtm_create(
     println!();
 }
 
+fn activation_path(substrate: &str) -> PathBuf {
+    substrate_root()
+        .join(substrate)
+        .join("activation")
+}
 
+pub fn load_activation(substrate: &str) -> u64 {
+    fs::read_to_string(activation_path(substrate))
+        .expect("missing substrate activation")
+        .trim()
+        .parse::<u64>()
+        .expect("invalid substrate activation")
+}
+
+fn persist_activation(substrate: &str, activation: u64) {
+    let path = activation_path(substrate);
+    let temporary = path.with_extension("tmp");
+
+    fs::write(&temporary, activation.to_string())
+        .expect("failed to write substrate activation");
+
+    fs::rename(&temporary, &path)
+        .expect("failed to commit substrate activation");
+}
 
 pub fn load_qtm(
     path: &PathBuf,
@@ -636,13 +662,10 @@ pub fn qtm_open(
     println!();
 }
 
-pub fn qtm_open_manifold(
-    substrate: &str,
-) -> Heritage {
-
+pub fn qtm_open_manifold(substrate: &str) -> Heritage {
     qtm_open_manifold_until(
         substrate,
-        u64::MAX,
+        load_activation(substrate),
     )
 }
 
