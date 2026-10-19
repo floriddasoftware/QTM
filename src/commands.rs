@@ -687,6 +687,304 @@ pub fn load_latest_qtm(
     )
 }
 
+/// Canonical payload root:
+/// ~/.qp/substrates/<substrate>/event/<network>/payload
+pub fn payload_path(
+    substrate: &str,
+    network: &str,
+) -> PathBuf {
+    substrate_root()
+        .join(substrate)
+        .join("event")
+        .join(network)
+        .join("payload")
+}
+
+/// Input environment owned by a transit event:
+/// ~/.qp/substrates/<substrate>/events/event_<activation>_<dimension>/<network>/payload
+pub fn event_payload_path(
+    substrate: &str,
+    activation: u64,
+    dimension: u128,
+    network: &str,
+) -> PathBuf {
+    substrate_root()
+        .join(substrate)
+        .join("events")
+        .join(format!(
+            "event_{}_{}",
+            activation,
+            dimension,
+        ))
+        .join(network)
+        .join("payload")
+}
+
+/// Output environment owned by an exile event:
+/// ~/.qp/substrates/<substrate>/events/exile_<activation>_<dimension>/<network>/payload
+pub fn exile_payload_path(
+    substrate: &str,
+    activation: u64,
+    dimension: u128,
+    network: &str,
+) -> PathBuf {
+    substrate_root()
+        .join(substrate)
+        .join("events")
+        .join(format!(
+            "exile_{}_{}",
+            activation,
+            dimension,
+        ))
+        .join(network)
+        .join("payload")
+}
+
+/// Persist Depth using its canonical retained object occurrences.
+///
+/// `Depth::objects()` joins the actual object map with protocol identifiers.
+/// No retained values or identifiers are fabricated.
+pub fn persist_payload_depth(
+    path: &Path,
+    depth: &Depth,
+) -> std::io::Result<()> {
+    fs::create_dir_all(path)?;
+
+    let mut entries = depth
+        .objects()
+        .map(|(position, identifier, retain)| {
+            format!(
+                "{}\t{}\t{}\t{}",
+                position,
+                hex::encode(identifier.as_bytes()),
+                retain.mass,
+                retain.from,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    // Depth::objects() iterates in canonical position order.
+    // Keep the ordering explicit in the persisted representation.
+    entries.sort_by_key(|entry| {
+        entry
+            .split('\t')
+            .next()
+            .and_then(|position| position.parse::<usize>().ok())
+            .unwrap_or(usize::MAX)
+    });
+
+    write_payload_file(
+        &path.join("depth.path"),
+        depth.path().as_bytes(),
+    )?;
+
+    write_payload_file(
+        &path.join("depth.objects"),
+        entries.join("\n").as_bytes(),
+    )?;
+
+    Ok(())
+}
+
+/// Atomically replace one file within its parent directory.
+fn write_payload_file(
+    destination: &Path,
+    contents: &[u8],
+) -> std::io::Result<()> {
+    let parent = destination.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "payload file has no parent directory",
+        )
+    })?;
+
+    fs::create_dir_all(parent)?;
+
+    let file_name = destination
+        .file_name()
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid payload filename",
+            )
+        })?
+        .to_string_lossy();
+
+    let temporary = parent.join(format!(
+        ".{}.{}.tmp",
+        file_name,
+        std::process::id(),
+    ));
+
+    let result = (|| -> std::io::Result<()> {
+        fs::write(&temporary, contents)?;
+        fs::rename(&temporary, destination)?;
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+
+    result
+}
+
+/// Transit persists only its input environment.
+pub fn persist_event_payload(
+    substrate: &str,
+    activation: u64,
+    dimension: u128,
+    network: &str,
+    input_depth: &Depth,
+) -> std::io::Result<()> {
+    persist_payload_depth(
+        &event_payload_path(
+            substrate,
+            activation,
+            dimension,
+            network,
+        ),
+        input_depth,
+    )
+}
+
+/// Exile persists only its output environment.
+pub fn persist_exile_payload(
+    substrate: &str,
+    activation: u64,
+    dimension: u128,
+    network: &str,
+    output_depth: &Depth,
+) -> std::io::Result<()> {
+    persist_payload_depth(
+        &exile_payload_path(
+            substrate,
+            activation,
+            dimension,
+            network,
+        ),
+        output_depth,
+    )
+}
+
+/// Recover a persisted Depth from its canonical representation.
+pub fn load_payload_depth(
+    path: &Path,
+) -> std::io::Result<Depth> {
+    let stored_path = fs::read_to_string(
+        path.join("depth.path"),
+    )?;
+
+    let contents = fs::read_to_string(
+        path.join("depth.objects"),
+    )?;
+
+    let mut depth = Depth::new(
+        stored_path.trim_end_matches('\n').to_string(),
+    );
+
+    for (line_number, line) in contents.lines().enumerate() {
+        let fields = line.split('\t').collect::<Vec<_>>();
+
+        if fields.len() != 4 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "invalid depth.objects entry at line {}",
+                    line_number + 1,
+                ),
+            ));
+        }
+
+        let position = fields[0]
+            .parse::<usize>()
+            .map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid depth position",
+                )
+            })?;
+
+        let identifier_bytes = hex::decode(fields[1])
+            .map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("invalid depth identifier: {error}"),
+                )
+            })?;
+
+        let identifier = String::from_utf8(identifier_bytes)
+            .map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "depth identifier is not UTF-8: {error}"
+                    ),
+                )
+            })?;
+
+        let mass = fields[2]
+            .parse::<u128>()
+            .map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid retained mass",
+                )
+            })?;
+
+        let from = fields[3]
+            .parse::<u64>()
+            .map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid retained source dimension",
+                )
+            })?;
+
+        depth.insert(
+            identifier,
+            position,
+            Retain { mass, from },
+        );
+    }
+
+    Ok(depth)
+}
+
+/// Load the input environment belonging to a transit event.
+pub fn load_event_payload(
+    substrate: &str,
+    activation: u64,
+    dimension: u128,
+    network: &str,
+) -> std::io::Result<Depth> {
+    load_payload_depth(
+        &event_payload_path(
+            substrate,
+            activation,
+            dimension,
+            network,
+        ),
+    )
+}
+
+/// Load the output environment belonging to an exile event.
+pub fn load_exile_payload(
+    substrate: &str,
+    activation: u64,
+    dimension: u128,
+    network: &str,
+) -> std::io::Result<Depth> {
+    load_payload_depth(
+        &exile_payload_path(
+            substrate,
+            activation,
+            dimension,
+            network,
+        ),
+    )
+}
+
 
 pub fn qtm_open(
     name: String,
