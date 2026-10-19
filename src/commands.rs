@@ -220,33 +220,24 @@ pub fn qtm_create(
     indices: Option<String>,
     entropy: Option<String>,
 ) {
+    // --------------------------------------------------
+    // Root Namespace
+    // --------------------------------------------------
+
+    let root = substrate_root();
+    let path = root.join(&name);
 
     // --------------------------------------------------
-    // 🔹 Root Namespace
-    // --------------------------------------------------
-
-    let root =
-        substrate_root();
-
-    let path =
-        root.join(&name);
-
-    // --------------------------------------------------
-    // 🔹 Existing Substrate Check
+    // Existing Substrate Check
     // --------------------------------------------------
 
     if path.exists() {
-
-        println!(
-            "⚠️ substrate already exists: {}",
-            name
-        );
-
+        println!("⚠️ substrate already exists: {}", name);
         return;
     }
 
     // --------------------------------------------------
-    // 🔹 Create Namespace
+    // Create Namespace
     // --------------------------------------------------
 
     fs::create_dir_all(&path)
@@ -256,80 +247,65 @@ pub fn qtm_create(
         .expect("failed to create substrate events path");
 
     // --------------------------------------------------
-    // 🔹 Domain Indices
+    // Domain Indices
     // --------------------------------------------------
 
-    let domain_indices: [u16; Perm::NUM_INDICES] =
-        match indices {
+    let domain_indices: [u16; Perm::NUM_INDICES] = match indices {
+        Some(raw) => {
+            let parsed: Vec<u16> = raw
+                .split(',')
+                .map(|v| {
+                    v.trim()
+                        .parse::<u16>()
+                        .expect("invalid domain index")
+                })
+                .collect();
 
-            Some(raw) => {
-
-                let parsed: Vec<u16> =
-                    raw.split(',')
-                        .map(|v| {
-                            v.trim()
-                                .parse::<u16>()
-                                .expect("invalid domain index")
-                        })
-                        .collect();
-
-                if parsed.len() != Perm::NUM_INDICES {
-
-                    panic!(
-                        "expected {} indices",
-                        Perm::NUM_INDICES
-                    );
-                }
-
-                parsed
-                    .try_into()
-                    .expect("failed to convert indices")
+            if parsed.len() != Perm::NUM_INDICES {
+                panic!(
+                    "expected {} indices",
+                    Perm::NUM_INDICES
+                );
             }
 
-            None => [0u16; Perm::NUM_INDICES],
-        };
+            parsed
+                .try_into()
+                .expect("failed to convert indices")
+        }
+
+        None => [0u16; Perm::NUM_INDICES],
+    };
 
     // --------------------------------------------------
-    // 🔹 Entropy Surface
+    // Entropy Surface
     // --------------------------------------------------
 
-    let entropy_surface =
-        entropy.unwrap_or_else(|| {
-            name.clone()
-        });
+    let entropy_surface = entropy.unwrap_or_else(|| name.clone());
 
     // --------------------------------------------------
-    // 🔹 PERM Genesis
+    // PERM Genesis
     // --------------------------------------------------
 
-    let perm =
-        Perm::genesis_construct(
-            &domain_indices,
-            entropy_surface.as_bytes(),
-        )
-        .expect("failed to construct PERM");
+    let perm = Perm::genesis_construct(
+        &domain_indices,
+        entropy_surface.as_bytes(),
+    )
+    .expect("failed to construct PERM");
 
     // --------------------------------------------------
-    // 🔹 QuantPerm Manifold
+    // QuantPerm Manifold
     // --------------------------------------------------
 
-    let manifold =
-        QuantPerm::new(
-            perm
-        );
+    let manifold = QuantPerm::new(perm);
 
     // --------------------------------------------------
-    // 🔹 Initial Commitment
+    // Initial Commitment
     // --------------------------------------------------
 
-    let qtm =
-        Qtm::commit(
-            &manifold,
-            0,
-        );
+    let qtm = Qtm::commit(&manifold, 0);
 
     // --------------------------------------------------
-    // 🔹 Persist Surfaces
+    // Persist Surfaces
     // --------------------------------------------------
 
     fs::write(
@@ -353,23 +329,19 @@ pub fn qtm_create(
         entropy_surface.as_bytes(),
     )
     .expect("failed to write entropy");
-    
+
     fs::write(path.join("activation"), "0")
-    .expect("failed to initialize substrate activation");
+        .expect("failed to initialize substrate activation");
 
     fs::write(
         path.join("qtm.commitment"),
-        hex::encode(
-            qtm.commitment
-        ),
+        hex::encode(qtm.commitment),
     )
     .expect("failed to write commitment");
 
     fs::write(
         path.join("qtm.coordinate"),
-        hex::encode(
-            qtm.coordinate
-        ),
+        hex::encode(qtm.coordinate),
     )
     .expect("failed to write coordinate");
 
@@ -386,7 +358,19 @@ pub fn qtm_create(
     .expect("failed to write sigma");
 
     // --------------------------------------------------
-    // 🔹 Observer Output
+    // Default Event Budget
+    // --------------------------------------------------
+
+    persist_budget(
+        &name,
+        12,              // min_events
+        12,              // max_events
+        120_000_000u128, // max_retained_mass
+    )
+    .expect("failed to persist default event budget");
+
+    // --------------------------------------------------
+    // Observer Output
     // --------------------------------------------------
 
     println!();
@@ -439,7 +423,18 @@ pub fn qtm_create(
     println!("{}", qtm.net_work);
 
     println!();
+
+    println!("🔹 event budget:");
+    println!("min_events: 12");
+    println!("max_events: 12");
+    println!("max_retained_mass: 120000000");
+
+    println!();
 }
+
+// --------------------------------------------------
+// Activation Persistence
+// --------------------------------------------------
 
 fn activation_path(substrate: &str) -> PathBuf {
     substrate_root()
@@ -465,7 +460,6 @@ fn persist_activation(substrate: &str, activation: u64) {
     fs::rename(&temporary, &path)
         .expect("failed to commit substrate activation");
 }
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EventBudget {
