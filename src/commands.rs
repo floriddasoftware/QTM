@@ -466,6 +466,162 @@ fn persist_activation(substrate: &str, activation: u64) {
         .expect("failed to commit substrate activation");
 }
 
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EventBudget {
+    pub min_events: u64,
+    pub max_events: u64,
+    pub max_retained_mass: u128,
+}
+
+impl EventBudget {
+    pub fn validate(&self) -> std::io::Result<()> {
+        if self.max_events == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "max_events must be at least 1",
+            ));
+        }
+
+        if self.min_events > self.max_events {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "min_events cannot exceed max_events",
+            ));
+        }
+
+        if self.max_retained_mass == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "max_retained_mass must be at least 1",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+/// Canonical persistent budget location:
+/// <substrate_root>/<substrate>/event/activation/network/budget
+pub fn budget_path(substrate: &str) -> PathBuf {
+    substrate_root()
+        .join(substrate)
+        .join("event")
+        .join("activation")
+        .join("network")
+        .join("budget")
+}
+
+/// Persist a budget for the specified local substrate.
+///
+/// The budget is stored at:
+/// <substrate_root>/<substrate>/event/activation/network/budget
+pub fn persist_budget(
+    substrate: &str,
+    min_events: u64,
+    max_events: u64,
+    max_retained_mass: u128,
+) -> std::io::Result<()> {
+    let budget = EventBudget {
+        min_events,
+        max_events,
+        max_retained_mass,
+    };
+
+    budget.validate()?;
+
+    let path = budget_path(substrate);
+    let parent = path.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid budget path",
+        )
+    })?;
+
+    fs::create_dir_all(parent)?;
+
+    let temporary = parent.join(format!(
+        ".budget.{}.tmp",
+        std::process::id(),
+    ));
+
+    let contents = format!(
+        "min_events={}\nmax_events={}\nmax_retained_mass={}\n",
+        budget.min_events,
+        budget.max_events,
+        budget.max_retained_mass,
+    );
+
+    let result = (|| -> std::io::Result<()> {
+        fs::write(&temporary, contents)?;
+        fs::rename(&temporary, &path)?;
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+
+    result
+}
+
+/// Shared read interface for every section of the crate.
+pub fn load_budget(substrate: &str) -> std::io::Result<EventBudget> {
+    let contents = fs::read_to_string(budget_path(substrate))?;
+    let mut values = BTreeMap::<String, String>::new();
+
+    for line in contents.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+
+        values.insert(key.trim().to_owned(), value.trim().to_owned());
+    }
+
+    let parse_u64 = |key: &str| -> std::io::Result<u64> {
+        values
+            .get(key)
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("missing {key}"),
+                )
+            })?
+            .parse::<u64>()
+            .map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("invalid {key}"),
+                )
+            })
+    };
+
+    let max_retained_mass = values
+        .get("max_retained_mass")
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "missing max_retained_mass",
+            )
+        })?
+        .parse::<u128>()
+        .map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid max_retained_mass",
+            )
+        })?;
+
+    let budget = EventBudget {
+        min_events: parse_u64("min_events")?,
+        max_events: parse_u64("max_events")?,
+        max_retained_mass,
+    };
+
+    budget.validate()?;
+    Ok(budget)
+}
+
 pub fn load_qtm(
     path: &PathBuf,
 ) -> Qtm {
