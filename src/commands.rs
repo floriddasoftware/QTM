@@ -968,21 +968,6 @@ pub fn load_event_payload(
     )
 }
 
-/// Wire packets owned by one event:
-/// ~/.qp/substrates/<substrate>/activations/<activation>/event/<commitment>/wirepackets
-pub fn wirepackets_path(
-    substrate: &str,
-    activation: u64,
-    commitment: &[u8; 32],
-) -> PathBuf {
-    substrate_root()
-        .join(substrate)
-        .join("activations")
-        .join(activation.to_string())
-        .join("event")
-        .join(hex::encode(commitment))
-        .join("wirepackets")
-}
 
 /// Atomically persist the serialized wire-packet bytes.
 ///
