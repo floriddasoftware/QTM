@@ -986,12 +986,27 @@ pub fn wirepackets_path(
 
 /// Atomically persist the serialized wire-packet bytes.
 ///
+/// Wire packets for one activation:
+/// ~/.qp/substrates/<substrate>/activations/<activation>/event/wirepackets
+pub fn wirepackets_path(
+    substrate: &str,
+    activation: u64,
+) -> PathBuf {
+    substrate_root()
+        .join(substrate)
+        .join("activations")
+        .join(activation.to_string())
+        .join("event")
+        .join("wirepackets")
+}
+
+/// Atomically persist the serialized wire-packet bytes.
+///
 /// Creates the event directory when needed.
 /// Uses the existing write_payload_file() implementation.
 pub fn persist_wirepackets(
     substrate: &str,
     activation: u64,
-    commitment: &[u8; 32],
     packets: &[u8],
 ) -> std::io::Result<()> {
     use std::path::Component;
@@ -1011,14 +1026,11 @@ pub fn persist_wirepackets(
     }
 
     write_payload_file(
-        &wirepackets_path(
-            substrate,
-            activation,
-            commitment,
-        ),
+        &wirepackets_path(substrate, activation),
         packets,
     )
 }
+
 /// Load the output environment belonging to an exile event.
 pub fn load_exile_payload(
     substrate: &str,
