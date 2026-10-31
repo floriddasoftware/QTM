@@ -1,9 +1,8 @@
-use std::{fs, u64};
-use std::path::{Path, PathBuf};
-use std::collections::BTreeMap;
 use std::{
+    collections::BTreeMap,
     fs,
     io,
+    path::{Path, PathBuf},
 };
 use quantom_value::{
     Perm,
@@ -1448,7 +1447,14 @@ pub fn qtm_close_heritage_until(
     });
 
     let qtm = load_qtm(&transit_path);
-    let depth = load_depth(&transit_path);
+    let depth = load_depth(&transit_path)
+    .unwrap_or_else(|error| {
+        panic!(
+            "failed to load event depth at {}: {}",
+            transit_path.display(),
+            error,
+        )
+    });
 
     let event = PQ44Event::balance(
         heritage,
@@ -1573,7 +1579,14 @@ pub fn load_event_at_activation(
     );
 
     let qtm = load_qtm(&path);
-    let depth = load_depth(&path);
+    let depth = load_depth(&path)
+    .unwrap_or_else(|error| {
+        panic!(
+            "failed to load persisted event depth at {}: {}",
+            path.display(),
+            error,
+        )
+    });
 
     if name.starts_with("event_") {
         PersistedEvent::Transit(QP44Event {
