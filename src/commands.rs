@@ -1,7 +1,10 @@
 use std::{fs, u64};
 use std::path::{Path, PathBuf};
 use std::collections::BTreeMap;
-
+use std::{
+    fs,
+    io,
+};
 use quantom_value::{
     Perm,
     QuantPerm,
@@ -157,44 +160,84 @@ where
     write("depth.objects", entries.join("\n"));
 }
 
+
 pub fn load_depth(
     path: &Path,
-) -> Depth {
-    let depth_path = fs::read_to_string(path.join("depth.path"))
-        .expect("missing depth.path");
+) -> io::Result<Depth> {
+    let depth_path = fs::read_to_string(
+        path.join("depth.path"),
+    )?;
 
-    let mut depth = Depth::new(depth_path.trim_end_matches('\n').to_string());
+    let mut depth = Depth::new(
+        depth_path.trim_end_matches('\n').to_string(),
+    );
 
-    let contents = fs::read_to_string(path.join("depth.objects"))
-        .expect("missing depth.objects");
+    let contents = fs::read_to_string(
+        path.join("depth.objects"),
+    )?;
 
     for (line_number, line) in contents.lines().enumerate() {
         let fields = line.split('\t').collect::<Vec<_>>();
 
         if fields.len() != 4 {
-            panic!(
-                "invalid depth.objects entry at line {}",
-                line_number + 1,
-            );
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "invalid depth.objects entry at line {}",
+                    line_number + 1,
+                ),
+            ));
         }
 
-        let position = fields[0]
-            .parse::<usize>()
-            .expect("invalid depth position");
+        let position = fields[0].parse::<usize>().map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "invalid depth position at line {}: {error}",
+                    line_number + 1,
+                ),
+            )
+        })?;
 
-        let identifier_bytes = hex::decode(fields[1])
-            .expect("invalid depth identifier");
+        let identifier_bytes = hex::decode(fields[1]).map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "invalid depth identifier at line {}: {error}",
+                    line_number + 1,
+                ),
+            )
+        })?;
 
-        let identifier = String::from_utf8(identifier_bytes)
-            .expect("depth identifier is not UTF-8");
+        let identifier = String::from_utf8(identifier_bytes).map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "depth identifier is not UTF-8 at line {}: {error}",
+                    line_number + 1,
+                ),
+            )
+        })?;
 
-        let mass = fields[2]
-            .parse::<u128>()
-            .expect("invalid retained mass");
+        let mass = fields[2].parse::<u128>().map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "invalid retained mass at line {}: {error}",
+                    line_number + 1,
+                ),
+            )
+        })?;
 
-        let from = fields[3]
-            .parse::<u64>()
-            .expect("invalid retained source dimension");
+        let from = fields[3].parse::<u64>().map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "invalid retained source dimension at line {}: {error}",
+                    line_number + 1,
+                ),
+            )
+        })?;
 
         depth.insert(
             identifier,
@@ -203,8 +246,9 @@ pub fn load_depth(
         );
     }
 
-    depth
+    Ok(depth)
 }
+
 
 pub fn substrate_root() -> PathBuf {
     let home = std::env::var("HOME")
