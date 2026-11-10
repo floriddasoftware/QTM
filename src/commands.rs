@@ -1012,34 +1012,36 @@ pub fn load_event_payload(
 }
 
 
-/// Atomically persist the serialized wire-packet bytes.
-///
-/// Wire packets for one activation:
-/// ~/.qp/substrates/<substrate>/activations/<activation>/event/wirepackets
+
+/// Wire packets for one submission:
+/// ~/.qp/substrates/<substrate>/activations/<activation>/event/<submission>/wirepackets
 pub fn wirepackets_path(
     substrate: &str,
     activation: u64,
+    submission: u64,
 ) -> PathBuf {
     substrate_root()
         .join(substrate)
         .join("activations")
         .join(activation.to_string())
         .join("event")
+        .join(submission.to_string())
         .join("wirepackets")
 }
 
-/// Atomically persist the serialized wire-packet bytes.
+/// Atomically persist the serialized wire-packet bytes
+/// belonging to one submission.
 ///
-/// Creates the event directory when needed.
-/// Uses the existing write_payload_file() implementation.
+/// Each submission has an independent WirePackets file.
+/// Creates the submission directory when needed.
 pub fn persist_wirepackets(
     substrate: &str,
     activation: u64,
+    submission: u64,
     packets: &[u8],
 ) -> std::io::Result<()> {
     use std::path::Component;
 
-    // Prevent a substrate name from escaping the substrate root.
     if substrate.is_empty()
         || Path::new(substrate)
             .components()
@@ -1052,6 +1054,17 @@ pub fn persist_wirepackets(
             "invalid substrate name",
         ));
     }
+
+    write_payload_file(
+        &wirepackets_path(
+            substrate,
+            activation,
+            submission,
+        ),
+        packets,
+    )
+}
+
 
     write_payload_file(
         &wirepackets_path(substrate, activation),
