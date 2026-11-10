@@ -259,6 +259,7 @@ pub fn substrate_root() -> PathBuf {
 }
 
 
+
 pub fn qtm_create(
     name: String,
     indices: Option<String>,
@@ -402,18 +403,6 @@ pub fn qtm_create(
     .expect("failed to write sigma");
 
     // --------------------------------------------------
-    // Default Event Budget
-    // --------------------------------------------------
-
-    persist_budget(
-        &name,
-        0,    // activation
-        12,   // min_events
-        1200, // max_events
-    )
-    .expect("failed to persist default event budget");
-
-    // --------------------------------------------------
     // Observer Output
     // --------------------------------------------------
 
@@ -467,13 +456,8 @@ pub fn qtm_create(
     println!("{}", qtm.net_work);
 
     println!();
-
-    println!("🔹 event budget:");
-    println!("min_events: 12");
-    println!("max_events: 1200");
-
-    println!();
 }
+
 
 // --------------------------------------------------
 // Activation Persistence
