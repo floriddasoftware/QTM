@@ -475,6 +475,7 @@ pub fn qtm_create(
     println!();
 }
 
+
 // --------------------------------------------------
 // Activation Persistence
 // --------------------------------------------------
@@ -503,6 +504,10 @@ fn persist_activation(substrate: &str, activation: u64) {
     fs::rename(&temporary, &path)
         .expect("failed to commit substrate activation");
 }
+
+// --------------------------------------------------
+// Event Budget Persistence
+// --------------------------------------------------
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EventBudget {
@@ -539,22 +544,21 @@ impl EventBudget {
 }
 
 /// Canonical persistent budget location:
-/// <substrate_root>/<substrate>/event/activation/network/budget
-pub fn budget_path(substrate: &str) -> PathBuf {
+/// <substrate_root>/<substrate>/<activation>/budget
+pub fn budget_path(
+    substrate: &str,
+    activation: u64,
+) -> PathBuf {
     substrate_root()
         .join(substrate)
-        .join("event")
-        .join("activation")
-        .join("network")
+        .join(activation.to_string())
         .join("budget")
 }
 
-/// Persist a budget for the specified local substrate.
-///
-/// The budget is stored at:
-/// <substrate_root>/<substrate>/event/activation/network/budget
+/// Persist the budget for one substrate activation.
 pub fn persist_budget(
     substrate: &str,
+    activation: u64,
     min_events: u64,
     max_events: u64,
     max_retained_mass: u128,
@@ -567,7 +571,7 @@ pub fn persist_budget(
 
     budget.validate()?;
 
-    let path = budget_path(substrate);
+    let path = budget_path(substrate, activation);
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -602,9 +606,15 @@ pub fn persist_budget(
     result
 }
 
-/// Shared read interface for every section of the crate.
-pub fn load_budget(substrate: &str) -> std::io::Result<EventBudget> {
-    let contents = fs::read_to_string(budget_path(substrate))?;
+/// Load the budget for a specific substrate activation.
+pub fn load_budget(
+    substrate: &str,
+    activation: u64,
+) -> std::io::Result<EventBudget> {
+    let contents = fs::read_to_string(
+        budget_path(substrate, activation),
+    )?;
+
     let mut values = BTreeMap::<String, String>::new();
 
     for line in contents.lines() {
@@ -658,6 +668,7 @@ pub fn load_budget(substrate: &str) -> std::io::Result<EventBudget> {
     budget.validate()?;
     Ok(budget)
 }
+
 
 pub fn load_qtm(
     path: &PathBuf,
