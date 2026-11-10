@@ -1066,12 +1066,6 @@ pub fn persist_wirepackets(
 }
 
 
-    write_payload_file(
-        &wirepackets_path(substrate, activation),
-        packets,
-    )
-}
-
 /// Load the output environment belonging to an exile event.
 pub fn load_exile_payload(
     substrate: &str,
