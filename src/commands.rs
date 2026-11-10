@@ -504,9 +504,10 @@ fn persist_activation(substrate: &str, activation: u64) {
         .expect("failed to commit substrate activation");
 }
 
-// --------------------------------------------------
-// Event Budget Persistence
-// --------------------------------------------------
+
+ // --------------------------------------------------
+ // Event Budget Persistence
+ // --------------------------------------------------
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EventBudget {
@@ -535,21 +536,25 @@ impl EventBudget {
 }
 
 /// Canonical persistent budget location:
-/// <substrate_root>/<substrate>/<activation>/budget
+/// <substrate_root>/<substrate>/event/<activation>/<network>/budget
 pub fn budget_path(
     substrate: &str,
     activation: u64,
+    network: &str,
 ) -> PathBuf {
     substrate_root()
         .join(substrate)
+        .join("event")
         .join(activation.to_string())
+        .join(network)
         .join("budget")
 }
 
-/// Persist the event budget for one substrate activation.
+/// Persist the event budget for one substrate activation and network.
 pub fn persist_budget(
     substrate: &str,
     activation: u64,
+    network: &str,
     min_events: u64,
     max_events: u64,
 ) -> std::io::Result<()> {
@@ -560,7 +565,7 @@ pub fn persist_budget(
 
     budget.validate()?;
 
-    let path = budget_path(substrate, activation);
+    let path = budget_path(substrate, activation, network);
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -594,13 +599,14 @@ pub fn persist_budget(
     result
 }
 
-/// Load the event budget for a specific substrate activation.
+/// Load the event budget for a specific substrate activation and network.
 pub fn load_budget(
     substrate: &str,
     activation: u64,
+    network: &str,
 ) -> std::io::Result<EventBudget> {
     let contents = fs::read_to_string(
-        budget_path(substrate, activation),
+        budget_path(substrate, activation, network),
     )?;
 
     let mut values = BTreeMap::<String, String>::new();
@@ -639,6 +645,7 @@ pub fn load_budget(
     budget.validate()?;
     Ok(budget)
 }
+
 
 
 
