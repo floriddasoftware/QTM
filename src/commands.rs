@@ -258,6 +258,7 @@ pub fn substrate_root() -> PathBuf {
         .join("substrates")
 }
 
+
 pub fn qtm_create(
     name: String,
     indices: Option<String>,
@@ -406,9 +407,9 @@ pub fn qtm_create(
 
     persist_budget(
         &name,
-        12,              // min_events
-        12,              // max_events
-        120_000_000u128, // max_retained_mass
+        0,    // activation
+        12,   // min_events
+        1200, // max_events
     )
     .expect("failed to persist default event budget");
 
@@ -469,12 +470,10 @@ pub fn qtm_create(
 
     println!("🔹 event budget:");
     println!("min_events: 12");
-    println!("max_events: 12");
-    println!("max_retained_mass: 120000000");
+    println!("max_events: 1200");
 
     println!();
 }
-
 
 // --------------------------------------------------
 // Activation Persistence
@@ -513,7 +512,6 @@ fn persist_activation(substrate: &str, activation: u64) {
 pub struct EventBudget {
     pub min_events: u64,
     pub max_events: u64,
-    pub max_retained_mass: u128,
 }
 
 impl EventBudget {
@@ -529,13 +527,6 @@ impl EventBudget {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "min_events cannot exceed max_events",
-            ));
-        }
-
-        if self.max_retained_mass == 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "max_retained_mass must be at least 1",
             ));
         }
 
@@ -555,18 +546,16 @@ pub fn budget_path(
         .join("budget")
 }
 
-/// Persist the budget for one substrate activation.
+/// Persist the event budget for one substrate activation.
 pub fn persist_budget(
     substrate: &str,
     activation: u64,
     min_events: u64,
     max_events: u64,
-    max_retained_mass: u128,
 ) -> std::io::Result<()> {
     let budget = EventBudget {
         min_events,
         max_events,
-        max_retained_mass,
     };
 
     budget.validate()?;
@@ -587,10 +576,9 @@ pub fn persist_budget(
     ));
 
     let contents = format!(
-        "min_events={}\nmax_events={}\nmax_retained_mass={}\n",
+        "min_events={}\nmax_events={}\n",
         budget.min_events,
         budget.max_events,
-        budget.max_retained_mass,
     );
 
     let result = (|| -> std::io::Result<()> {
@@ -606,7 +594,7 @@ pub fn persist_budget(
     result
 }
 
-/// Load the budget for a specific substrate activation.
+/// Load the event budget for a specific substrate activation.
 pub fn load_budget(
     substrate: &str,
     activation: u64,
@@ -643,31 +631,15 @@ pub fn load_budget(
             })
     };
 
-    let max_retained_mass = values
-        .get("max_retained_mass")
-        .ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "missing max_retained_mass",
-            )
-        })?
-        .parse::<u128>()
-        .map_err(|_| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "invalid max_retained_mass",
-            )
-        })?;
-
     let budget = EventBudget {
         min_events: parse_u64("min_events")?,
         max_events: parse_u64("max_events")?,
-        max_retained_mass,
     };
 
     budget.validate()?;
     Ok(budget)
 }
+
 
 
 pub fn load_qtm(
