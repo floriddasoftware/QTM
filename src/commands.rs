@@ -1040,6 +1040,44 @@ pub fn persist_wirepackets(
 }
 
 
+
+/// Load the serialized wire packets belonging to one submission.
+///
+/// Reads:
+/// ~/.qp/substrates/<substrate>/activations/<activation>/event/<submission>/wirepackets
+///
+/// Returns the exact persisted packet bytes without decoding,
+/// modifying, or reconstructing the packet sequence.
+pub fn load_wirepackets(
+    substrate: &str,
+    activation: u64,
+    submission: u64,
+) -> std::io::Result<Vec<u8>> {
+    use std::path::Component;
+
+    if substrate.is_empty()
+        || Path::new(substrate)
+            .components()
+            .any(|component| {
+                !matches!(component, Component::Normal(_))
+            })
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid substrate name",
+        ));
+    }
+
+    fs::read(
+        wirepackets_path(
+            substrate,
+            activation,
+            submission,
+        ),
+    )
+}
+
+
 /// Load the output environment belonging to an exile event.
 pub fn load_exile_payload(
     substrate: &str,
