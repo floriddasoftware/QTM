@@ -1568,6 +1568,31 @@ pub fn qtm_close_heritage_until(
             })
     }
     
+    
+    pub fn exile_path_at_activation(
+    substrate: &str,
+    activation: u64,
+) -> Option<PathBuf> {
+    let events_root = substrate_root()
+        .join(substrate)
+        .join("events");
+
+    fs::read_dir(events_root)
+        .ok()?
+        .filter_map(Result::ok)
+        .find_map(|entry| {
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            if !name.starts_with("exile_") {
+                return None;
+            }
+
+            match activation_from_name(&name) {
+                Some(a) if a == activation => Some(entry.path()),
+                _ => None,
+            }
+        })
+}
 
     pub enum PersistedEvent {
         Transit(QP44Event),
@@ -1578,10 +1603,8 @@ pub fn load_event_at_activation(
     substrate: &str,
     activation: u64,
 ) -> PersistedEvent {
-    let path = event_path_at_activation(
-        substrate,
-        activation,
-    )
+    let path = event_path_at_activation(substrate, activation)
+    .or_else(|| exile_path_at_activation(substrate, activation))
     .unwrap_or_else(|| {
         panic!("event not found at activation {}", activation)
     });
