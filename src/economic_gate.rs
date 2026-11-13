@@ -1,8 +1,9 @@
+
 use crate::protocolvalue::Qtm;
 use crate::protocol_id::QuantumId;
 use crate::pathsregistry::CoinType;
 use quantom_value::{DimensionObservation, Heritage};
-use crate::qp44::QP44Event;
+use crate::qp44::{Flow, QP44Event};
 use qtm_graph::graph::frame::{Direction, EventMap};
 use crate::{
     PQ44Event,
@@ -10,9 +11,11 @@ use crate::{
     load_event_at_activation,
     qtm_open_manifold_until,
 };
+
 //
-// 🔹 Secure Balance Proof Gate (Sealed)
+// Secure Balance Proof Gate
 //
+
 mod sealed {
     pub trait Sealed {}
 }
@@ -31,8 +34,9 @@ impl VerifiedBalanceProof {
 }
 
 //
-// 🔹 Canonical Gate (NO DUPLICATION)
+// Canonical Gate
 //
+
 pub fn verify_balance(
     balance: u128,
     required: u128,
@@ -41,20 +45,12 @@ pub fn verify_balance(
 }
 
 //
-// 🔹 Canonical Cost Verification (ONLY SOURCE OF TRUTH)
+// Canonical Cost Verification
 //
+
 pub fn verify_cost(
     heritage: &Heritage,
 ) -> Option<VerifiedBalanceProof> {
-
-
-    // 🛡️ MODEL 1 EXCEPTION
-    //
-    // Local manifold replay:
-    // - no external debt
-    // - no external creditor
-    // - no settlement required
-    //
     if heritage.transition.gross_work
         == heritage.transition.net_work
         && heritage.state.activations() <= 1
@@ -62,81 +58,51 @@ pub fn verify_cost(
         return Some(VerifiedBalanceProof::new());
     }
 
-    // 1. Observation (ONLY from Heritage)
     let obs = DimensionObservation {
         dimension: heritage.state.dimension(),
         structural_value: heritage.state.structural_value(),
         activations: heritage.state.activations(),
     };
 
-    // 2. Protocol (stateless law)
     let protocol = QuantumId::new();
-    // 🔥 Use NETWORK (tau) as instantaneous field
     let mass = heritage.state.retained_mass();
-    
-    let eco =
-        Qtm::from_observation(
-            &obs,
-            &protocol,
-        ); 
-        let density =
-        eco.density.unwrap_or(1);
 
-    let gross_work =
-        heritage.transition.gross_work;
+    let eco = Qtm::from_observation(
+        &obs,
+        &protocol,
+    );
 
-    
+    let density = eco.density.unwrap_or(1);
 
-    
+    let gross_work = heritage.transition.gross_work;
+
     let required = protocol
         ._debt(&obs, heritage.transition.tau)
         .unwrap_or(0);
 
-    let credit =
-        gross_work.saturating_div(density);
+    let credit = gross_work.saturating_div(density);
+    let debt = required.saturating_div(mass);
 
-    let debt =
-        required.saturating_div(mass);
-
-
-
-
-    // 3. Gate
     verify_balance(credit, debt)
 }
 
-
-
-//This code is operating at a very specific layer
-
-//It is not a ledger layer.
-
-//It is also not a network layer.
-
-//It is a projection layer (or semantic observation layer).
-//Coordinate
-//↓
-//Commitment
-// ↓
-//Heritage
 //
-// 🔹 Structure (Projection only — no external truth)
+// Structure
 //
+
 #[derive(Clone)]
 pub struct Structure {
     pub coin: CoinType,
-    pub commitment: [u8; 32], // 🔥 canonical identity
-    pub density: u128,        // 🔥 derived, not fetched
+    pub commitment: [u8; 32],
+    pub density: u128,
 }
 
 impl Structure {
-
     pub fn from_heritage(
         coin: CoinType,
         heritage: &Heritage,
         commitment: [u8; 32],
     ) -> Self {
-
         let protocol = QuantumId::new();
 
         let obs = DimensionObservation {
@@ -163,15 +129,15 @@ impl Structure {
 }
 
 //
-// 🔹 Economy (PURE PROJECTION — NO NETWORK)
+// Economy
 //
+
 pub struct Economy {
     pub gravity: u128,
     pub structures: Vec<Structure>,
 }
 
 impl Economy {
-
     pub fn total_density(&self) -> u128 {
         self.structures.iter().map(|s| s.density).sum()
     }
@@ -180,7 +146,6 @@ impl Economy {
         heritage: &Heritage,
         commitment: [u8; 32],
     ) -> Self {
-
         let mut structures = Vec::new();
 
         for &coin in CoinType::all() {
@@ -201,14 +166,14 @@ impl Economy {
 }
 
 //
-// 🔹 Global Ledger (Optional Aggregation Layer)
+// Global Ledger
 //
+
 pub struct EconomyLedger {
     pub states: Vec<Economy>,
 }
 
 impl EconomyLedger {
-
     pub fn total_density(&self) -> u128 {
         self.states
             .iter()
@@ -218,15 +183,15 @@ impl EconomyLedger {
     }
 }
 
+//
+// Transactional Worldline Model
+//
 
-//Transactional Worldline Model implementation, with a small dependency on Model 1 (Physics)
-//Everything here describes a transported state:
-
-//amount      -> activation state
-//net_work    -> carried structural mass
-//commitment  -> event identity
-//coordinate  -> worldline identity
-//constant    -> traversed invariant
+pub struct QuantumTransaction {
+    pub amount: u64,
+    pub qtm: Qtm,
+    pub constant: PersistedEvent,
+}
 
 impl QuantumTransaction {
     pub fn send(
@@ -260,8 +225,6 @@ impl QuantumTransaction {
             }
 
             PersistedEvent::Exile(event) => {
-                // Qtm is not Clone or Copy. Preserve the persisted
-                // event and construct the separate transaction witness.
                 let qtm = Qtm {
                     commitment: event.qtm.commitment,
                     coordinate: event.qtm.coordinate,
@@ -282,6 +245,7 @@ impl QuantumTransaction {
     pub fn receive(
         self,
         substrate: &str,
+        _flow: Flow,
     ) -> QP44Event {
         let QuantumTransaction {
             amount: activation,
@@ -289,8 +253,6 @@ impl QuantumTransaction {
             constant,
         } = self;
 
-        // The sender's persisted exile is the transport witness.
-        // Its Depth is already the mass memory.
         let (depth, sender_constant) = match constant {
             PersistedEvent::Exile(event) => {
                 let sender_constant =
@@ -316,7 +278,6 @@ impl QuantumTransaction {
             },
         );
 
-        // Recover the receiver's historical manifold.
         let mut heritage =
             qtm_open_manifold_until(
                 substrate,
@@ -329,7 +290,6 @@ impl QuantumTransaction {
         let source_delta =
             heritage.transition.delta;
 
-        // Re-anchor the receiver to native PERM geometry.
         heritage.state.set_initial_dimension_from_perm();
 
         let manifold = heritage.state;
@@ -347,8 +307,6 @@ impl QuantumTransaction {
             hex::encode(&sender_qtm.commitment[..4]),
         );
 
-        // Realize the receiver transition from the persisted Depth.
-        // No TotalMass reconstruction and no second Flow application.
         let proof = verify_balance(0, 0)
             .expect("economic gate failed");
 
@@ -395,8 +353,6 @@ impl QuantumTransaction {
             event.heritage.transition.delta,
         );
 
-        // Validate the independently realized receiver transition
-        // against the sender's persisted witness.
         Self::uniformity(
             &sender_qtm,
             sender_constant,
@@ -413,10 +369,6 @@ impl QuantumTransaction {
         sender_constant: u128,
         event: &QP44Event,
     ) {
-        // ─────────────────────────────────────
-        // [ID] Geometry layer
-        // ─────────────────────────────────────
-
         let expected_coordinate =
             Qtm::derive_coordinate(
                 &event.heritage.state,
@@ -427,10 +379,6 @@ impl QuantumTransaction {
 
         let geometry_preserved =
             sender_qtm.coordinate == event.qtm.coordinate;
-
-        // ─────────────────────────────────────
-        // [ECON] Economic layer
-        // ─────────────────────────────────────
 
         let expected_sigma =
             event.heritage.state.structural_value();
@@ -448,19 +396,11 @@ impl QuantumTransaction {
             expected_commitment.commitment
                 == event.qtm.commitment;
 
-        // ─────────────────────────────────────
-        // [TX] Transport layer
-        // ─────────────────────────────────────
-
         let receiver_delta =
             event.heritage.transition.delta;
 
         let transport_valid =
             receiver_delta <= sender_constant;
-
-        // ─────────────────────────────────────
-        // Reporting
-        // ─────────────────────────────────────
 
         println!();
         println!("──────────── Uniformity ────────────");
