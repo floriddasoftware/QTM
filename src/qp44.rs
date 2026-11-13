@@ -27,7 +27,7 @@ pub enum Flow {
     /// External mass entering the manifold.
     Receive,
     /// Internal network decay.
-    Change,
+    Change(u128),
 }
 
 #[repr(C)]
@@ -63,17 +63,22 @@ pub struct QP44Object {
 }
 
 impl Flow {
-    pub fn stream(self, heritage: &Heritage)->(u128, u128){
-        match self{Flow::Receive => {
-            let external = heritage.state.activations() as u128;
-            (external, 0u128)
+    pub fn stream(
+        self,
+        heritage: &Heritage,
+    ) -> (u128, u128) {
+        match self {
+            Self::Receive => (
+                heritage.state.activations() as u128,
+                0,
+            ),
+
+            Self::Change(delta) => (
+                0,
+                delta,
+            ),
         }
-            Flow::Change => {
-                let change = heritage.transition.delta;
-                (0u128, change)
-            }
     }
- }
 }
 
 impl TotalMass {
