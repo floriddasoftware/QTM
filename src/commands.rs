@@ -1604,10 +1604,10 @@ pub fn load_event_at_activation(
     activation: u64,
 ) -> PersistedEvent {
     let path = event_path_at_activation(substrate, activation)
-    .or_else(|| exile_path_at_activation(substrate, activation))
-    .unwrap_or_else(|| {
-        panic!("event not found at activation {}", activation)
-    });
+        .or_else(|| exile_path_at_activation(substrate, activation))
+        .unwrap_or_else(|| {
+            panic!("event not found at activation {}", activation)
+        });
 
     let name = path
         .file_name()
@@ -1615,20 +1615,42 @@ pub fn load_event_at_activation(
         .to_string_lossy()
         .to_string();
 
-    let heritage = qtm_open_manifold_until(
-        substrate,
-        activation,
-    );
+    let heritage = if name.starts_with("event_") {
+        qtm_open_manifold_until(substrate, activation)
+    } else if name.starts_with("exile_") {
+        let source_activation = activation
+            .checked_add(1)
+            .unwrap_or_else(|| {
+                panic!(
+                    "exile source activation overflow at activation {}",
+                    activation,
+                )
+            });
+
+        let source_heritage =
+            qtm_open_manifold_until(substrate, source_activation);
+
+        qtm_close_manifold_until(
+            source_heritage,
+            activation,
+        )
+    } else {
+        panic!(
+            "unknown persisted event namespace: {}",
+            name,
+        );
+    };
 
     let qtm = load_qtm(&path);
+
     let depth = load_depth(&path)
-    .unwrap_or_else(|error| {
-        panic!(
-            "failed to load persisted event depth at {}: {}",
-            path.display(),
-            error,
-        )
-    });
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to load persisted event depth at {}: {}",
+                path.display(),
+                error,
+            )
+        });
 
     if name.starts_with("event_") {
         PersistedEvent::Transit(QP44Event {
@@ -1636,16 +1658,11 @@ pub fn load_event_at_activation(
             qtm,
             depth,
         })
-    } else if name.starts_with("exile_") {
+    } else {
         PersistedEvent::Exile(PQ44Event {
             heritage,
             qtm,
             depth,
         })
-    } else {
-        panic!(
-            "unknown persisted event namespace: {}",
-            name,
-        );
     }
 }
