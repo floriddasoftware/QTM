@@ -227,44 +227,49 @@ impl EconomyLedger {
 //commitment  -> event identity
 //coordinate  -> worldline identity
 //constant    -> traversed invariant
-pub struct QuantumTransaction {
-    pub amount: u64,
-    pub qtm: Qtm,
-    pub constant: PersistedEvent,
-}
-
-
 impl QuantumTransaction {
     pub fn send(
-    substrate: &str,
-    amount: u64,
-) -> Self {
-    let activation = amount;
+        substrate: &str,
+        amount: u64,
+    ) -> Self {
+        let activation = amount;
 
-    let (heritage, qtm, depth) =
-        match load_event_at_activation(substrate, activation) {
-            PersistedEvent::Transit(event) => (
-                event.heritage,
-                event.qtm,
-                event.depth,
-            ),
-            PersistedEvent::Exile(event) => (
-                event.heritage,
-                event.qtm,
-                event.depth,
-            ),
+        let constant = match load_event_at_activation(
+            substrate,
+            activation,
+        ) {
+            PersistedEvent::Transit(event) => {
+                let QP44Event {
+                    heritage,
+                    qtm,
+                    depth,
+                } = event;
+
+                let balance = PQ44Event::balance(
+                    heritage,
+                    &qtm,
+                    depth,
+                );
+
+                QuantumTransaction {
+                    amount: activation,
+                    qtm,
+                    constant: PersistedEvent::Exile(balance),
+                }
+            }
+
+            PersistedEvent::Exile(event) => {
+                let qtm = event.qtm;
+
+                QuantumTransaction {
+                    amount: activation,
+                    qtm,
+                    constant: PersistedEvent::Exile(event),
+                }
+            }
         };
 
-    let balance = PQ44Event::balance(
-        heritage,
-        &qtm,
-        depth,
-    );
-
-    QuantumTransaction {
-        amount: activation,
-        qtm,
-        constant: PersistedEvent::Exile(balance),
+        constant
     }
 }
 
