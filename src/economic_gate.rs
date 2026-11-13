@@ -1,9 +1,9 @@
 use crate::protocolvalue::Qtm;
-use crate::qp44::{TotalMass, Flow, QP44Event, QP44Object};
 use crate::protocol_id::QuantumId;
 use crate::pathsregistry::CoinType;
 use quantom_value::{DimensionObservation, Heritage};
-use qtm_graph::graph::frame::Depth;
+use crate::qp44::QP44Event;
+use qtm_graph::graph::frame::{Direction, EventMap};
 use crate::{
     PQ44Event,
     PersistedEvent,
@@ -227,6 +227,7 @@ impl EconomyLedger {
 //commitment  -> event identity
 //coordinate  -> worldline identity
 //constant    -> traversed invariant
+
 impl QuantumTransaction {
     pub fn send(
         substrate: &str,
@@ -234,7 +235,7 @@ impl QuantumTransaction {
     ) -> Self {
         let activation = amount;
 
-        let constant = match load_event_at_activation(
+        match load_event_at_activation(
             substrate,
             activation,
         ) {
@@ -251,7 +252,7 @@ impl QuantumTransaction {
                     depth,
                 );
 
-                QuantumTransaction {
+                Self {
                     amount: activation,
                     qtm,
                     constant: PersistedEvent::Exile(balance),
@@ -259,286 +260,257 @@ impl QuantumTransaction {
             }
 
             PersistedEvent::Exile(event) => {
-                let qtm = event.qtm;
+                // Qtm is not Clone or Copy. Preserve the persisted
+                // event and construct the separate transaction witness.
+                let qtm = Qtm {
+                    commitment: event.qtm.commitment,
+                    coordinate: event.qtm.coordinate,
+                    net_work: event.qtm.net_work,
+                    sigma: event.qtm.sigma,
+                };
 
-                QuantumTransaction {
+                Self {
                     amount: activation,
                     qtm,
                     constant: PersistedEvent::Exile(event),
                 }
             }
-        };
-
-        constant
+        }
     }
-}
-
 
     #[inline(always)]
     pub fn receive(
-        &self,
+        self,
         substrate: &str,
-        flow: Flow,
     ) -> QP44Event {
-    
-        // -------------------------------------------------------------------------
-        // The transaction itself is the recovered manifold.
-        // `amount` is the activation boundary established by `send()`.
-        // -------------------------------------------------------------------------
-    
-        let activation =self.amount;
-    
-        let net_work = self.qtm.net_work;
-    
-        // -------------------------------------------------------------------------
-        // Recover historical manifold state up to activation boundary.
-        // -------------------------------------------------------------------------
-    
+        let QuantumTransaction {
+            amount: activation,
+            qtm: sender_qtm,
+            constant,
+        } = self;
+
+        // The sender's persisted exile is the transport witness.
+        // Its Depth is already the mass memory.
+        let (depth, sender_constant) = match constant {
+            PersistedEvent::Exile(event) => {
+                let sender_constant =
+                    event.heritage.transition.delta;
+
+                let depth = event.depth;
+
+                (depth, sender_constant)
+            }
+
+            PersistedEvent::Transit(_) => {
+                panic!(
+                    "receive requires a balanced exile event at activation {}",
+                    activation,
+                );
+            }
+        };
+
+        let depth_mass = depth.objects().fold(
+            0u128,
+            |total, (_, _, retain)| {
+                total.saturating_add(retain.mass)
+            },
+        );
+
+        // Recover the receiver's historical manifold.
         let mut heritage =
             qtm_open_manifold_until(
                 substrate,
                 activation,
             );
-    
-        let prev_mass =
-            heritage.state.retained_mass();
-    
-        let amount =
-            heritage.state.activations();
-    
-        // -------------------------------------------------------------------------
-        // Re-anchor recovered state to native PERM geometry before
-        // constructing the receive topology.
-        // -------------------------------------------------------------------------
-    
-        heritage.state
-        .set_initial_dimension_from_perm();
-    
-        // -------------------------------------------------------------------------
-        // Recover the historical QTM witness.
-        // -------------------------------------------------------------------------
-    
-        let (account, change) =
-            flow.stream(
-                &heritage,
-            );
-    
-        let manifold =
-            heritage.state;
-    
-        let mass =
-            TotalMass::from_memorized(
-                0,
-                prev_mass,
-                account,
-                change,
-                amount as u128,
-            )
-            .memorize();
-    
-        let object =
-            QP44Object {
-                manifold,
-                coin: mass,
-            }
-            .realize();
-    
+
+        let source_tau =
+            heritage.transition.tau;
+
+        let source_delta =
+            heritage.transition.delta;
+
+        // Re-anchor the receiver to native PERM geometry.
+        heritage.state.set_initial_dimension_from_perm();
+
+        let manifold = heritage.state;
+
         println!(
             "[RX] act={} nw={} Δ={}",
             activation,
-            net_work,
-            heritage.transition.delta,
+            sender_qtm.net_work,
+            source_delta,
         );
-    
+
         println!(
             "     coord={}.. commit={}..",
-            hex::encode(
-                &self.qtm.coordinate[..4],
-            ),
-            hex::encode(
-                &self.qtm.commitment[..4],
-            ),
+            hex::encode(&sender_qtm.coordinate[..4]),
+            hex::encode(&sender_qtm.commitment[..4]),
         );
-    
-        let event =
-            object;
-    
+
+        // Realize the receiver transition from the persisted Depth.
+        // No TotalMass reconstruction and no second Flow application.
+        let proof = verify_balance(0, 0)
+            .expect("economic gate failed");
+
+        let seed = QuantumId::new().quantum_seed(proof);
+
+        let receiver_heritage = Direction::transit(
+            manifold,
+            &depth,
+            Some(&seed),
+        );
+
+        let event_map = EventMap::now(
+            receiver_heritage,
+            qtm_graph::graph::scale::Scale::Global,
+        );
+
+        let receiver_net_work =
+            event_map.net_work();
+
+        let receiver_qtm = Qtm::commit(
+            &event_map.heritage().state,
+            receiver_net_work,
+        );
+
+        let receiver_heritage =
+            event_map.heritage;
+
+        let event = QP44Event {
+            heritage: receiver_heritage,
+            qtm: receiver_qtm,
+            depth,
+        };
+
         println!(
             "\n================ OBSERVE RESULT ===================",
         );
-    
+
         println!(
-            "[RX] act={} tau={} mass={} nw={} Δ={}",
-            activation,
-            heritage.transition.tau,
-            mass,
-            self.qtm.net_work,
-            heritage.transition.delta,
+            "[RX] act={} tau={} depth_mass={} nw={} Δ={}",
+            event.heritage.state.activations(),
+            event.heritage.transition.tau,
+            depth_mass,
+            event.qtm.net_work,
+            event.heritage.transition.delta,
         );
-    
-        // -------------------------------------------------------------------------
-        // Uniformity gate authorizes the receive topology.
-        // -------------------------------------------------------------------------
-    
+
+        // Validate the independently realized receiver transition
+        // against the sender's persisted witness.
         Self::uniformity(
-            &self,
+            &sender_qtm,
+            sender_constant,
             &event,
         );
-    
+
+        let _ = source_tau;
+
         event
     }
-    
-        // The gate currently proves neither is preserved.
-// It only proves both were derived correctly.
 
-fn uniformity(
-    tx: &Self,
-    event: &QP44Event,
-) {
-    use crate::protocolvalue::Qtm;
+    fn uniformity(
+        sender_qtm: &Qtm,
+        sender_constant: u128,
+        event: &QP44Event,
+    ) {
+        // ─────────────────────────────────────
+        // [ID] Geometry layer
+        // ─────────────────────────────────────
 
-    // ─────────────────────────────────────
-    // [ID] Geometry layer
-    // ─────────────────────────────────────
+        let expected_coordinate =
+            Qtm::derive_coordinate(
+                &event.heritage.state,
+            );
 
-    let expected_coordinate =
-        Qtm::derive_coordinate(
-            &event.heritage.state,
+        let identity_valid =
+            expected_coordinate == event.qtm.coordinate;
+
+        let geometry_preserved =
+            sender_qtm.coordinate == event.qtm.coordinate;
+
+        // ─────────────────────────────────────
+        // [ECON] Economic layer
+        // ─────────────────────────────────────
+
+        let expected_sigma =
+            event.heritage.state.structural_value();
+
+        let sigma_valid =
+            expected_sigma == event.qtm.sigma;
+
+        let expected_commitment =
+            Qtm::commit(
+                &event.heritage.state,
+                event.qtm.net_work,
+            );
+
+        let commitment_valid =
+            expected_commitment.commitment
+                == event.qtm.commitment;
+
+        // ─────────────────────────────────────
+        // [TX] Transport layer
+        // ─────────────────────────────────────
+
+        let receiver_delta =
+            event.heritage.transition.delta;
+
+        let transport_valid =
+            receiver_delta <= sender_constant;
+
+        // ─────────────────────────────────────
+        // Reporting
+        // ─────────────────────────────────────
+
+        println!();
+        println!("──────────── Uniformity ────────────");
+
+        println!(
+            "[ID ] valid={} evolved={} {}.. → {}..",
+            identity_valid,
+            !geometry_preserved,
+            hex::encode(&sender_qtm.coordinate[..4]),
+            hex::encode(&event.qtm.coordinate[..4]),
         );
 
-    let identity_valid =
-        expected_coordinate
-            ==
-        event.qtm.coordinate;
-
-    let geometry_preserved =
-        tx.qtm.coordinate
-            ==
-        event.qtm.coordinate;
-
-    // ─────────────────────────────────────
-    // [ECON] Economic layer
-    // ─────────────────────────────────────
-
-    let expected_sigma =
-        event
-            .heritage
-            .state
-            .structural_value();
-
-    let sigma_valid =
-        expected_sigma
-            ==
-        event.qtm.sigma;
-
-    let expected_commitment =
-        Qtm::commit(
-            &event.heritage.state,
-            event.qtm.net_work,
+        println!(
+            "[ECON] sigma={} commit={}",
+            sigma_valid,
+            commitment_valid,
         );
 
-    let commitment_valid =
-        expected_commitment.commitment
-            ==
-        event.qtm.commitment;
+        println!(
+            "[TX ] sender_delta={} receiver_delta={}",
+            sender_constant,
+            receiver_delta,
+        );
 
-    // ─────────────────────────────────────
-    // [TX] Transport layer
-    // ─────────────────────────────────────
-    //
-    // `constant` is the persisted event itself.
-    // Derive the canonical sender Δ from that witness.
-    //
+        println!(
+            "[TX ] transport_valid={}",
+            transport_valid,
+        );
 
-    let sender_constant =
-    match &tx.constant {
-        PersistedEvent::Transit(event) =>
-            event
-                .heritage
-                .transition
-                .delta,
+        println!("────────────────────────────────────");
+        println!();
 
-        PersistedEvent::Exile(event) =>
-            event
-                .heritage
-                .transition
-                .delta,
-    };
+        assert!(
+            identity_valid,
+            "geometry invariant violation",
+        );
 
-    let receiver_delta =
-        event
-            .heritage
-            .transition
-            .delta;
+        assert!(
+            sigma_valid,
+            "sigma invariant violation",
+        );
 
-    println!(
-        "[TX ] constant={} delta={}",
-        sender_constant,
-        receiver_delta,
-    );
+        assert!(
+            commitment_valid,
+            "commitment invariant violation",
+        );
 
-    // ─────────────────────────────────────
-    // Reporting
-    // ─────────────────────────────────────
-
-    println!();
-    println!("──────────── Uniformity ────────────");
-    
-    println!(
-        "[ID ] valid={} evolved={} {}.. → {}..",
-        identity_valid,
-        !geometry_preserved,
-        hex::encode(
-            &tx.qtm.coordinate[..4]
-        ),
-        hex::encode(
-            &event.qtm.coordinate[..4]
-        ),
-    );
-
-    println!(
-        "[ECON] sigma={} commit={}",
-        sigma_valid,
-        commitment_valid,
-    );
-
-    println!(
-        "[TX ] sender_delta={} receiver_delta={}",
-        sender_constant,
-        receiver_delta,
-    );
-
-    println!(
-        "[TX ] transport_valid={}",
-        receiver_delta <= sender_constant,
-    );
-
-    println!("────────────────────────────────────");
-    println!();
-
-    // Geometry must always be valid
-
-    assert!(
-        identity_valid,
-        "geometry invariant violation",
-    );
-
-    // Economic state must always be valid
-
-    assert!(
-        sigma_valid,
-        "sigma invariant violation",
-    );
-
-    // Transport commitment must always be valid
-
-    assert!(
-        commitment_valid,
-        "commitment invariant violation",
-    );
-
-    // Receiver may not exceed the sender's persisted
-    // manifold resistance.
-
-   }
+        assert!(
+            transport_valid,
+            "transport invariant violation: receiver delta exceeds sender constant",
+        );
+    }
 }
