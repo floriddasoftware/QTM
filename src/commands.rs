@@ -865,6 +865,111 @@ pub fn persist_event_payload(
     )
 }
 
+
+/// Submission event directory:
+/// ~/.qp/substrates/<substrate>/activations/<activation>/event/<submission>
+pub fn submission_path(
+    substrate: &str,
+    activation: u64,
+    submission: u64,
+) -> PathBuf {
+    substrate_root()
+        .join(substrate)
+        .join("activations")
+        .join(activation.to_string())
+        .join("event")
+        .join(submission.to_string())
+}
+
+/// Persist the QP44 event belonging to one submission.
+pub fn persist_submission<E: HeritageEvent>(
+    substrate: &str,
+    activation: u64,
+    submission: u64,
+    event: &E,
+) -> io::Result<()> {
+    use std::path::Component;
+
+    if substrate.is_empty()
+        || Path::new(substrate)
+            .components()
+            .any(|component| {
+                !matches!(component, Component::Normal(_))
+            })
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid substrate name",
+        ));
+    }
+
+    if submission == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "submission must be greater than zero",
+        ));
+    }
+
+    let path = submission_path(
+        substrate,
+        activation,
+        submission,
+    );
+
+    fs::create_dir_all(&path)?;
+
+    let heritage = event.heritage();
+    let qtm = event.qtm();
+    let depth = event.depth();
+
+    let mut entries = depth
+        .objects()
+        .map(|(position, identifier, retain)| {
+            format!(
+                "{}\t{}\t{}\t{}",
+                position,
+                hex::encode(identifier.as_bytes()),
+                retain.mass,
+                retain.from,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    entries.sort_by_key(|entry| {
+        entry
+            .split('\t')
+            .next()
+            .and_then(|position| position.parse::<usize>().ok())
+            .unwrap_or(usize::MAX)
+    });
+
+    let persisted = [
+        ("manifold.dimension", heritage.state.dimension().to_string()),
+        ("manifold.structural_value", heritage.state.structural_value().to_string()),
+        ("manifold.activations", heritage.state.activations().to_string()),
+        ("manifold.retained_mass", heritage.state.retained_mass().to_string()),
+        ("transition.mirror", hex::encode(heritage.transition.mirror_bytes)),
+        ("transition.tau", heritage.transition.tau.to_string()),
+        ("transition.delta", heritage.transition.delta.to_string()),
+        ("transition.gross_work", heritage.transition.gross_work.to_string()),
+        ("transition.net_work", heritage.transition.net_work.to_string()),
+        ("qtm.commitment", hex::encode(qtm.commitment)),
+        ("qtm.coordinate", hex::encode(qtm.coordinate)),
+        ("qtm.network", qtm.net_work.to_string()),
+        ("qtm.sigma", qtm.sigma.to_string()),
+        ("depth.path", depth.path().to_string()),
+        ("depth.objects", entries.join("\n")),
+    ];
+    for (name, value) in persisted {
+        write_payload_file(
+            &path.join(name),
+            value.as_bytes(),
+        )?;
+    }
+    Ok(())
+}
+
+
 /// Exile persists only its output environment.
 pub fn persist_exile_payload(
     substrate: &str,
