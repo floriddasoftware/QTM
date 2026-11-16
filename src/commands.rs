@@ -866,6 +866,7 @@ pub fn persist_event_payload(
 }
 
 
+
 /// Submission event directory:
 /// ~/.qp/substrates/<substrate>/activations/<activation>/event/<submission>
 pub fn submission_path(
@@ -879,6 +880,87 @@ pub fn submission_path(
         .join(activation.to_string())
         .join("event")
         .join(submission.to_string())
+}
+
+/// Network directory belonging to one submission:
+/// ~/.qp/substrates/<substrate>/activations/<activation>/event/<submission>/<network>
+pub fn submission_network_path(
+    substrate: &str,
+    activation: u64,
+    submission: u64,
+    network: &str,
+) -> PathBuf {
+    submission_path(
+        substrate,
+        activation,
+        submission,
+    )
+    .join(network)
+}
+
+/// Validate a network identifier as one directory name.
+fn validate_submission_network(
+    network: &str,
+) -> io::Result<()> {
+    use std::path::Component;
+
+    if network.is_empty()
+        || Path::new(network)
+            .components()
+            .any(|component| {
+                !matches!(component, Component::Normal(_))
+            })
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid submission network",
+        ));
+    }
+
+    Ok(())
+}
+
+/// Create the network directory belonging to one submission.
+pub fn persist_submission_network(
+    substrate: &str,
+    activation: u64,
+    submission: u64,
+    network: &str,
+) -> io::Result<PathBuf> {
+    use std::path::Component;
+
+    if substrate.is_empty()
+        || Path::new(substrate)
+            .components()
+            .any(|component| {
+                !matches!(component, Component::Normal(_))
+            })
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid substrate name",
+        ));
+    }
+
+    if submission == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "submission must be greater than zero",
+        ));
+    }
+
+    validate_submission_network(network)?;
+
+    let path = submission_network_path(
+        substrate,
+        activation,
+        submission,
+        network,
+    );
+
+    fs::create_dir_all(&path)?;
+
+    Ok(path)
 }
 
 /// Persist the QP44 event belonging to one submission.
@@ -960,14 +1042,125 @@ pub fn persist_submission<E: HeritageEvent>(
         ("depth.path", depth.path().to_string()),
         ("depth.objects", entries.join("\n")),
     ];
+
     for (name, value) in persisted {
         write_payload_file(
             &path.join(name),
             value.as_bytes(),
         )?;
     }
+
     Ok(())
 }
+
+/// Wire packets for one submission and network:
+/// ~/.qp/substrates/<substrate>/activations/<activation>/event/<submission>/<network>/wirepackets
+pub fn wirepackets_path(
+    substrate: &str,
+    activation: u64,
+    submission: u64,
+    network: &str,
+) -> PathBuf {
+    submission_network_path(
+        substrate,
+        activation,
+        submission,
+        network,
+    )
+    .join("wirepackets")
+}
+
+/// Atomically persist serialized wire packets for one submission network.
+pub fn persist_wirepackets(
+    substrate: &str,
+    activation: u64,
+    submission: u64,
+    network: &str,
+    packets: &[u8],
+) -> io::Result<()> {
+    use std::path::Component;
+
+    if substrate.is_empty()
+        || Path::new(substrate)
+            .components()
+            .any(|component| {
+                !matches!(component, Component::Normal(_))
+            })
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid substrate name",
+        ));
+    }
+
+    if submission == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "submission must be greater than zero",
+        ));
+    }
+
+    validate_submission_network(network)?;
+
+    persist_submission_network(
+        substrate,
+        activation,
+        submission,
+        network,
+    )?;
+
+    write_payload_file(
+        &wirepackets_path(
+            substrate,
+            activation,
+            submission,
+            network,
+        ),
+        packets,
+    )
+}
+
+/// Load the exact persisted wire packets for one submission network.
+pub fn load_wirepackets(
+    substrate: &str,
+    activation: u64,
+    submission: u64,
+    network: &str,
+) -> io::Result<Vec<u8>> {
+    use std::path::Component;
+
+    if substrate.is_empty()
+        || Path::new(substrate)
+            .components()
+            .any(|component| {
+                !matches!(component, Component::Normal(_))
+            })
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid substrate name",
+        ));
+    }
+
+    if submission == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "submission must be greater than zero",
+        ));
+    }
+
+    validate_submission_network(network)?;
+
+    fs::read(
+        wirepackets_path(
+            substrate,
+            activation,
+            submission,
+            network,
+        ),
+    )
+}
+
 
 
 /// Exile persists only its output environment.
@@ -1090,97 +1283,6 @@ pub fn load_event_payload(
     )
 }
 
-
-
-/// Wire packets for one submission:
-/// ~/.qp/substrates/<substrate>/activations/<activation>/event/<submission>/wirepackets
-pub fn wirepackets_path(
-    substrate: &str,
-    activation: u64,
-    submission: u64,
-) -> PathBuf {
-    substrate_root()
-        .join(substrate)
-        .join("activations")
-        .join(activation.to_string())
-        .join("event")
-        .join(submission.to_string())
-        .join("wirepackets")
-}
-
-/// Atomically persist the serialized wire-packet bytes
-/// belonging to one submission.
-///
-/// Each submission has an independent WirePackets file.
-/// Creates the submission directory when needed.
-pub fn persist_wirepackets(
-    substrate: &str,
-    activation: u64,
-    submission: u64,
-    packets: &[u8],
-) -> std::io::Result<()> {
-    use std::path::Component;
-
-    if substrate.is_empty()
-        || Path::new(substrate)
-            .components()
-            .any(|component| {
-                !matches!(component, Component::Normal(_))
-            })
-    {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "invalid substrate name",
-        ));
-    }
-
-    write_payload_file(
-        &wirepackets_path(
-            substrate,
-            activation,
-            submission,
-        ),
-        packets,
-    )
-}
-
-
-
-/// Load the serialized wire packets belonging to one submission.
-///
-/// Reads:
-/// ~/.qp/substrates/<substrate>/activations/<activation>/event/<submission>/wirepackets
-///
-/// Returns the exact persisted packet bytes without decoding,
-/// modifying, or reconstructing the packet sequence.
-pub fn load_wirepackets(
-    substrate: &str,
-    activation: u64,
-    submission: u64,
-) -> std::io::Result<Vec<u8>> {
-    use std::path::Component;
-
-    if substrate.is_empty()
-        || Path::new(substrate)
-            .components()
-            .any(|component| {
-                !matches!(component, Component::Normal(_))
-            })
-    {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "invalid substrate name",
-        ));
-    }
-
-    fs::read(
-        wirepackets_path(
-            substrate,
-            activation,
-            submission,
-        ),
-    )
-}
 
 
 /// Load the output environment belonging to an exile event.
