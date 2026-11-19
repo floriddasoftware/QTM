@@ -1045,6 +1045,81 @@ pub fn load_wirepackets(
 }
 
 
+
+/// Signing record for one wire-packet commitment:
+/// ~/.qp/substrates/<substrate>/activations/<activation>/network/<network>/wirepacket/<commitment>/signing
+pub fn wirepacket_signing_path(
+    substrate: &str,
+    activation: u64,
+    network: &str,
+    commitment: &str,
+) -> PathBuf {
+    network_path(substrate, activation, network)
+        .join("wirepacket")
+        .join(commitment)
+        .join("signing")
+}
+
+/// Atomically persist the signing record associated with a wire-packet commitment.
+pub fn persist_wirepacket_signing(
+    substrate: &str,
+    activation: u64,
+    network: &str,
+    commitment: &str,
+    signing: &[u8],
+) -> io::Result<()> {
+    validate_substrate(substrate)?;
+    validate_network(network)?;
+    validate_commitment(commitment)?;
+
+    write_payload_file(
+        &wirepacket_signing_path(
+            substrate,
+            activation,
+            network,
+            commitment,
+        ),
+        signing,
+    )
+}
+
+/// Load the persisted signing record for one wire-packet commitment.
+pub fn load_wirepacket_signing(
+    substrate: &str,
+    activation: u64,
+    network: &str,
+    commitment: &str,
+) -> io::Result<Vec<u8>> {
+    validate_substrate(substrate)?;
+    validate_network(network)?;
+    validate_commitment(commitment)?;
+
+    fs::read(wirepacket_signing_path(
+        substrate,
+        activation,
+        network,
+        commitment,
+    ))
+}
+
+fn validate_commitment(commitment: &str) -> io::Result<()> {
+    let decoded = hex::decode(commitment).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid wire-packet commitment",
+        )
+    })?;
+
+    if decoded.len() != 32 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "wire-packet commitment must be 32 bytes",
+        ));
+    }
+
+    Ok(())
+}
+
 /// Exile persists only its output environment.
 pub fn persist_exile_payload(
     substrate: &str,
