@@ -983,12 +983,14 @@ pub fn persist_network_event<E: HeritageEvent>(
     Ok(())
 }
 
-/// Wire packets for one activation network:
-/// ~/.qp/substrates/<substrate>/activations/<activation>/network/<network>/wirepackets
+
+/// WirePackets for one activation, network, and submission:
+/// ~/.qp/substrates/&lt;substrate&gt;/activations/&lt;activation&gt;/network/&lt;network&gt;/wirepackets/&lt;submission&gt;
 pub fn wirepackets_path(
     substrate: &str,
     activation: u64,
     network: &str,
+    submission: u64,
 ) -> PathBuf {
     network_path(
         substrate,
@@ -996,24 +998,34 @@ pub fn wirepackets_path(
         network,
     )
     .join("wirepackets")
+    .join(submission.to_string())
 }
 
-/// Atomically persist serialized wire packets for one activation network.
+/// Atomically persist serialized WirePackets for one submission.
 pub fn persist_wirepackets(
     substrate: &str,
     activation: u64,
     network: &str,
+    submission: u64,
     packets: &[u8],
 ) -> io::Result<()> {
     validate_substrate(substrate)?;
     validate_network(network)?;
+
+    if submission == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "submission must be greater than zero",
+        ));
+    }
 
     fs::create_dir_all(
         network_path(
             substrate,
             activation,
             network,
-        ),
+        )
+        .join("wirepackets"),
     )?;
 
     write_payload_file(
@@ -1021,25 +1033,35 @@ pub fn persist_wirepackets(
             substrate,
             activation,
             network,
+            submission,
         ),
         packets,
     )
 }
 
-/// Load the exact persisted wire packets for one activation network.
+/// Load the exact persisted WirePackets for one submission.
 pub fn load_wirepackets(
     substrate: &str,
     activation: u64,
     network: &str,
+    submission: u64,
 ) -> io::Result<Vec<u8>> {
     validate_substrate(substrate)?;
     validate_network(network)?;
+
+    if submission == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "submission must be greater than zero",
+        ));
+    }
 
     fs::read(
         wirepackets_path(
             substrate,
             activation,
             network,
+            submission,
         ),
     )
 }
